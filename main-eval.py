@@ -46,8 +46,8 @@ def plot_example_spects(testing_data):
     plt.savefig("res-eval-64-%d.png" % i)
 
 
-def compute_intel_metrics(directory, rir_directory, net):
-    reconstructed_signals, direct_path_signals, full_rev_signals = recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_rirs=1)
+def compute_intel_metrics(directory, rir_directory, net, mask=False):
+    reconstructed_signals, direct_path_signals, full_rev_signals = recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_rirs=1, mask=mask)
 
     stoi_rec_sum = 0
     stoi_rev_sum = 0
@@ -142,14 +142,14 @@ if __name__=="__main__":
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
     # Extract Dataset
-    test_dataset = extract_dataset(directory_test, rir_directory_test, num_files=140, num_rirs=1)
+    test_dataset = extract_dataset(directory_test, rir_directory_test,
+                                   140, 1,
+                                   training_set=False, mask=False)
 
     # Plot Example Spect Comparison
     plot_example_spects(test_dataset)
 
-    # Inteligibility Evaluation
-
-    intel_res = compute_intel_metrics(directory_test, rir_directory_test, net)
+    intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=True)
     plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3])
 
     

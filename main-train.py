@@ -1,5 +1,4 @@
 import torch
-from torch.utils.data import DataLoader
 
 from Model_Classes.ci_unet_class import CI_Unet_64, train
 from Data.dataset import extract_dataset
@@ -20,11 +19,17 @@ if __name__=="__main__":
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
     # Extract Dataset
-    train_dataset = extract_dataset(directory_train, rir_directory_train, num_files=100, num_rirs=24)
-    test_dataset = extract_dataset(directory_test, rir_directory_test, num_files=140, num_rirs=1)
-
+    print("Extracting train set...")
+    train_dataset = extract_dataset(directory_train, rir_directory_train,
+                                    100, 24,
+                                    training_set=True, mask=True)
+    print("Extracting test set...")
+    test_dataset = extract_dataset(directory_test, rir_directory_test,
+                                   140, 1,
+                                   training_set=False, mask=True)
+    print("Training")
     # Train
-    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset)
+    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=True)
 
     
 

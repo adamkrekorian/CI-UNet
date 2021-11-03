@@ -41,7 +41,7 @@ def add_noise_at_20db(spect):
     spect[spect == 0] = 1e-40
     return spect
 
-def create_spectrogram(file, rir):
+def create_spectrogram(file, rir, norm=True):
     fs, x = wavfile.read(file)
     x_rev = apply_reverberation(x, rir)
     window_len = N_BINS*2
@@ -50,9 +50,11 @@ def create_spectrogram(file, rir):
     num_extra_bands = stft_out.shape[0] - N_BINS
     stft_out = stft_out[:-num_extra_bands, :] if num_extra_bands > 0 else stft_out
     spect = np.abs(stft_out)
-    spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
-    spect, min_x, max_x = normalize(spect)
-    return spect, np.angle(stft_out), [min_x, max_x]
+    if norm:
+        spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
+        spect, min_x, max_x = normalize(spect)
+        return spect, np.angle(stft_out), [min_x, max_x]
+    return spect, np.angle(stft_out), None
 
 def spect_train_set_for_rir(directory, rir, num_files=5):
     data = np.zeros((N_BINS,1))
@@ -78,26 +80,98 @@ def spect_test_datapoint(file, rir):
         spect = np.concatenate((spect, zero_pad), axis=1)
         phase = np.concatenate((phase, zero_pad), axis=1)
     N = (spect.shape[1] // N_BINS)
-    temp_list = np.split(spect, N, axis=1)
-    temp_phase_list = np.split(phase, N, axis=1)
-    return temp_list, temp_phase_list
+    spect_list = np.split(spect, N, axis=1)
+    phase_list = np.split(phase, N, axis=1)
+    return spect_list, phase_list
 
 def spect_test_set_for_rir(directory, rir, num_files=5):
-    data_arr = []
+    spect_data_arr = []
     phase_data_arr = []
     for i, filename in enumerate(os.listdir(directory)):
         if i == num_files:
             break
         f = os.path.join(directory, filename)
         if os.path.isfile(f):
-            temp_list, temp_phase_list = spect_test_datapoint(f, rir)
-            data_arr.extend(temp_list)
-            phase_data_arr.extend(temp_phase_list)
+            spect_list, phase_list = spect_test_datapoint(f, rir)
+            spect_data_arr.extend(spect_list)
+            phase_data_arr.extend(phase_list)
         else:
             num_files += 1
-    return data_arr, phase_data_arr
+    return spect_data_arr, phase_data_arr
 
-def create_spect_set(directory, rir_directory, spect_function, num_files=5, num_rirs=3, fs=16000):
+def calculate_srr(rev_spect, dir_spect):
+    eps = 2.2204e-16
+    power_dir = np.square(np.abs(dir_spect))
+    power_rev = np.square(np.abs(rev_spect - dir_spect))
+    srr = power_dir / (power_rev + eps)
+    srr[srr==0] = eps
+    return srr
+
+def calculate_esnr(f, rir, dir_rir):
+    _, sig = wavfile.read(f)
+    rev_sig = apply_reverberation(sig, rir)
+    dir_sig = apply_reverberation(sig, dir_rir)
+    resid_sig = rev_sig - dir_sig
+    esnr = 10 * np.log(np.sum(np.square(dir_sig)) / np.sum(np.square(resid_sig)))
+    return esnr
+
+def ibm_from_srr(srr_dB, t):
+    ibm = np.where(srr_dB > t, 1, 0)
+    ibm = np.nan_to_num(ibm)
+    return ibm
+
+def ibm_train_set_for_rir(directory, rir, dir_rir, num_files=5):
+    data = np.zeros((N_BINS,1))
+    for i, filename in enumerate(os.listdir(directory)):
+        if i == num_files:
+            break
+        f = os.path.join(directory, filename)
+        if os.path.isfile(f):
+            rev_spect, _, _ = create_spectrogram(f, rir, norm=False)
+            dir_spect, _, _ = create_spectrogram(f, dir_rir, norm=False)
+            srr = calculate_srr(rev_spect, dir_spect)
+            esnr = calculate_esnr(f, rir, dir_rir)
+            srr_dB = 10 * np.log(srr);
+            T = -6
+            ideal_binary_mask = ibm_from_srr(srr_dB, T + esnr)
+            data = np.concatenate((data, ideal_binary_mask), axis=1)
+        else:
+            num_files += 1
+    data = data[:, 1:-(data.shape[1] % N_BINS - 1)]
+    N = (data.shape[1] // N_BINS)
+    ibm_arr = np.split(data, N, axis=1)
+    return ibm_arr
+
+def ibm_test_datapoint(file, rir, dir_rir):
+    rev_spect, _, _ = create_spectrogram(file, rir, norm=False)
+    dir_spect, _, _ = create_spectrogram(file, dir_rir, norm=False)
+    srr = calculate_srr(rev_spect, dir_spect)
+    esnr = calculate_esnr(file, rir, dir_rir)
+    srr_dB = 10 * np.log(srr);
+    T = -6
+    ideal_binary_mask = ibm_from_srr(srr_dB, T + esnr)
+    pad_amount = N_BINS - (ideal_binary_mask.shape[1] % N_BINS)
+    if pad_amount != 0:
+        one_pad = np.ones((N_BINS, pad_amount))
+        ideal_binary_mask = np.concatenate((ideal_binary_mask, one_pad), axis=1)
+    N = (ideal_binary_mask.shape[1] // N_BINS)
+    ibm_list = np.split(ideal_binary_mask, N, axis=1)
+    return ibm_list
+
+def ibm_test_set_for_rir(directory, rir, dir_rir, num_files=5):
+    ibm_arr = []
+    for i, filename in enumerate(os.listdir(directory)):
+        if i == num_files:
+            break
+        f = os.path.join(directory, filename)
+        if os.path.isfile(f):
+            ibm_list = ibm_test_datapoint(f, rir, dir_rir)
+            ibm_arr.extend(ibm_list)
+        else:
+            num_files += 1
+    return ibm_arr
+
+def create_spect_set(directory, rir_directory, spect_function, num_files=5, num_rirs=3, fs=16000, mask=False, mask_function=None):
     X_arr = []
     y_arr = []
     for i, rir_filename in enumerate(os.listdir(rir_directory)):
@@ -107,10 +181,14 @@ def create_spect_set(directory, rir_directory, spect_function, num_files=5, num_
         if os.path.isfile(r):
             rir = load_rir(r, fs)
             dir_rir = get_direct_rir(rir, fs)
-            full_rev_arr, phase_data_arr = spect_function(directory, rir, num_files=num_files)
-            dir_rev_arr, phase_data_arr = spect_function(directory, dir_rir, num_files=num_files)
+            full_rev_arr, _ = spect_function(directory, rir, num_files=num_files)
             X_arr.extend(full_rev_arr)
-            y_arr.extend(dir_rev_arr)
+            if mask:
+                ibm_arr = mask_function(directory, rir, dir_rir, num_files=num_files)
+                y_arr.extend(ibm_arr)
+            else:
+                dir_rev_arr, _ = spect_function(directory, dir_rir, num_files=num_files)
+                y_arr.extend(dir_rev_arr)
     return X_arr, y_arr
 
 
@@ -145,10 +223,16 @@ class CustomCIDataset(Dataset):
     def scale_values(self):
         return [self.min_x, self.max_x, self.min_y, self.max_y]
 
+def extract_dataset(directory, rir_directory, num_files, num_rirs, training_set=True, mask=False):
+    if training_set:
+        X, y = create_spect_set(directory, rir_directory, spect_train_set_for_rir,
+                                num_files=num_files, num_rirs=num_rirs,
+                                mask=mask, mask_function=ibm_train_set_for_rir)
+    else:
+        X, y = create_spect_set(directory, rir_directory, spect_test_set_for_rir,
+                                num_files=num_files, num_rirs=num_rirs,
+                                mask=mask, mask_function=ibm_test_set_for_rir)
 
-def extract_dataset(directory, rir_directory, num_files, num_rirs):
-    X, y = create_spect_set(directory, rir_directory, spect_train_set_for_rir, num_files=num_files, num_rirs=num_rirs)
-    
     X = np.array(X)
     y = np.array(y)
 
