@@ -2,6 +2,7 @@ import datetime
 
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
 # Model Definition
 class CBL(nn.Module):
@@ -207,12 +208,17 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
     # Learning rate decay policy.
     DECAY_EPOCHS = 2
     DECAY = 0.8
-        
+    # Loss function
     criterion = loss_f
+    # Optimizer
     optimizer = torch.optim.Adam(net.parameters(),
                              lr=INITIAL_LR,
                              weight_decay=REG)
-    
+    # Initialize dataloaders
+    train_dataloader = DataLoader(train_data, batch_size=1, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True)
+
+
     global_step = 0
     best_val_loss = 100
     current_learning_rate = INITIAL_LR
@@ -228,7 +234,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
         train_loss = 0
         train_acc = 0
             
-        for batch_idx, (inputs, targets) in enumerate(train_data):
+        for batch_idx, (inputs, targets) in enumerate(train_dataloader):
             inputs = inputs.to(device)  # Copy inputs to device
             targets = targets.to(device)  # Copy targets to device
                 
@@ -255,7 +261,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
                 
         val_loss = 0
         with torch.no_grad():  # Disable gradient during validation
-            for batch_idx, (inputs, targets) in enumerate(test_data):
+            for batch_idx, (inputs, targets) in enumerate(test_dataloader):
                 inputs = inputs.to(device)
                 targets = targets.to(device)
                 optimizer.zero_grad()
@@ -263,7 +269,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
                 loss = criterion(outputs, targets)
                 val_loss += loss
 
-        avg_loss = val_loss / len(test_data)
+        avg_loss = val_loss / len(test_dataloader)
         print("Validation loss: %.4f" % (avg_loss))
 
         if avg_loss < best_val_loss:
