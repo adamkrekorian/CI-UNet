@@ -1,16 +1,7 @@
+import datetime
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-
-import numpy as np
-
-import scipy.io as sio
-from scipy.io import wavfile
-from scipy.fft import fft, ifft
-from scipy import signal
 
 # Model Definition
 class CBL(nn.Module):
@@ -97,7 +88,7 @@ class DCT(nn.Module):
 
 class CI_Unet_64(nn.Module):
     def __init__(self):
-        super(CI_Unet, self).__init__()
+        super(CI_Unet_64, self).__init__()
         self.down1 = CL(1, 64, 5)                # 32x32
         self.down2 = CBL(64, 128, 5)             # 16x16
         self.down3 = CBL(128, 256, 5)            # 8x8
@@ -143,7 +134,7 @@ class CI_Unet_64(nn.Module):
     
 class CI_Unet_256(nn.Module):
     def __init__(self):
-        super(CI_Unet, self).__init__()
+        super(CI_Unet_256, self).__init__()
         self.down1 = CL(1, 64, 5)
         self.down2 = CBL(64, 128, 5)
         self.down3 = CBL(128, 256, 5)
@@ -198,7 +189,7 @@ class CI_Unet_256(nn.Module):
         # print(x16.shape)
         return x16
 
-def train(n_bins, model, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epochs=10, loss_f=torch.nn.MSELoss(), optim=torch.optim.Adam(model.parameters())):
+def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epochs=10, loss_f=torch.nn.MSELoss()):
     # Model Training
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     net = net.to(device)
@@ -218,10 +209,9 @@ def train(n_bins, model, train_data, test_data, mask=False, lr=0.01, reg=1e-3, e
     DECAY = 0.8
         
     criterion = loss_f
-    optimizer = optim
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = INITIAL_LR
-        param_group['weight_decay'] = REG
+    optimizer = torch.optim.Adam(net.parameters(),
+                             lr=INITIAL_LR,
+                             weight_decay=REG)
     
     global_step = 0
     best_val_loss = 100
@@ -273,7 +263,7 @@ def train(n_bins, model, train_data, test_data, mask=False, lr=0.01, reg=1e-3, e
                 loss = criterion(outputs, targets)
                 val_loss += loss
 
-        avg_loss = val_loss / len(test_dataloader)
+        avg_loss = val_loss / len(test_data)
         print("Validation loss: %.4f" % (avg_loss))
 
         if avg_loss < best_val_loss:

@@ -2,11 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
+
+from pystoi import stoi
+from pesq import pesq
 
 from Model_Classes.ci_unet_class import CI_Unet_64
 from Data.dataset import extract_dataset
@@ -132,21 +130,24 @@ def plot_intel_res(stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg):
 if __name__=="__main__":
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print("device = {}".format(device))
     net = CI_Unet_64()
     net = net.to(device)
 
-    net.load_state_dict(torch.load("./ci-unet-64.pt"))
+    net.load_state_dict(torch.load("./Saved_Models/ci-unet-64.pt", map_location=torch.device(device)))
     net.eval()
+    
+    # Data paths
+    directory_test = "./Data/Speech_Files/Testing/"
+    rir_directory_test = "./Data/RIR_Files/Testing/"
 
     # Extract Dataset
-    
-    
+    test_dataset = extract_dataset(directory_test, rir_directory_test, num_files=140, num_rirs=1)
+
     # Plot Example Spect Comparison
-    plot_example_spects(testing_data)
+    plot_example_spects(test_dataset)
 
     # Inteligibility Evaluation
-    directory_test = "../Data/Speech_Files/Testing/"
-    rir_directory_test = "../Data/RIR_Files/Testing/"
 
     intel_res = compute_intel_metrics(directory_test, rir_directory_test, net)
     plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3])

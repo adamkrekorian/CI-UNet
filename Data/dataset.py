@@ -1,29 +1,13 @@
-import argparse
 import os
-import sys
-import time
-import datetime
-import glob
-import math
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
-import pandas as pd
 import numpy as np
 
 import scipy.io as sio
 from scipy.io import wavfile
-from scipy.fft import fft, ifft
 from scipy import signal
-
-import matplotlib.pyplot as plt
-from pystoi import stoi
-from pesq import pesq
 
 N_BINS = 64
 fs = 16000
@@ -165,13 +149,13 @@ class CustomCIDataset(Dataset):
 def extract_dataset(directory, rir_directory, num_files, num_rirs):
     X, y = create_spect_set(directory, rir_directory, spect_train_set_for_rir, num_files=num_files, num_rirs=num_rirs)
     
+    X = np.array(X)
+    y = np.array(y)
+
     X_tensor = torch.Tensor(X)
     y_tensor = torch.Tensor(y)
 
-    dataset = CustomCIDataset(X_tensor, y_tensor)
-
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
-    return dataloader
+    return CustomCIDataset(X_tensor, y_tensor)
     
 
 if __name__=="__main__":
@@ -182,5 +166,5 @@ if __name__=="__main__":
     directory_test = "../Data/Speech_Files/Testing/"
     rir_directory_test = "../Data/RIR_Files/Testing/"
 
-    train_dataloader = extract_dataset(directory, rir_directory, 100, 24)
-    test_dataloader = extract_dataset(directory_test, rir_directory_test, 140, 1)
+    train_dataset = extract_dataset(directory, rir_directory, 100, 24)
+    test_dataset = extract_dataset(directory_test, rir_directory_test, 140, 1)
