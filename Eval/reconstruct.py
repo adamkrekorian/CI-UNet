@@ -22,6 +22,8 @@ def apply_net_to_spect(net, spect, scl_vals, mask=False):
     net_output = np.squeeze(net_output).cpu().numpy()
     net_output = np.nan_to_num(net_output)
     if mask:
+        net_output[net_output < 0.5] = 0
+        net_output[net_output >= 0.5] = 1
         net_output = spect * net_output
     net_output = ((net_output+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
     return net_output
@@ -70,14 +72,14 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=5, num_rirs
                     break
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
-                    dir_rir = dataset.get_direct_rir(rir, 16000)
                     fs, x = wavfile.read(f)
                     dir_path_signal = dataset.apply_reverberation(x, dir_rir)
-                    full_rev_signal = dataset.apply_reverberation(x, rir)
                     sig_len = len(dir_path_signal)
+                    full_rev_signal = dataset.apply_reverberation(x, rir)
+                    rec_signal = recreate_signal_datapoint(f, rir, net, sig_len, mask=mask)
                     direct_path_signals.append(dir_path_signal)
                     full_rev_signals.append(full_rev_signal[:sig_len])
-                    reconstructed_signals.append(recreate_signal_datapoint(f, rir, net, sig_len, mask=mask))
+                    reconstructed_signals.append(rec_signal)
                 else:
                     num_files += 1
         else:

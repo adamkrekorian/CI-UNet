@@ -132,7 +132,6 @@ class CI_Unet_64(nn.Module):
         #print(x14.shape)
         return x12
 
-    
 class CI_Unet_256(nn.Module):
     def __init__(self):
         super(CI_Unet_256, self).__init__()
@@ -241,7 +240,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
             optimizer.zero_grad()  # Zero the gradient of the optimizer
                 
             outputs = net.forward(inputs)  # Forward pass to generate outputs
-                
+           
             loss = criterion(outputs, targets)  # Compute loss
             loss.backward()  # Backward loss and compute gradient
                 
@@ -266,6 +265,9 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
                 targets = targets.to(device)
                 optimizer.zero_grad()
                 outputs = net(inputs)
+                if mask:
+                    outputs[outputs < 0.5] = 0
+                    outputs[outputs >= 0.5] = 1
                 loss = criterion(outputs, targets)
                 val_loss += loss
 
@@ -276,9 +278,9 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
             print("Saving...")
             best_val_loss = avg_loss
             if mask:
-                torch.save(net.state_dict(), "../Saved_Models/ci-unet-bm-%d.pt" % n_bins)
+                torch.save(net.state_dict(), "./Saved_Models/ci-unet-bm-%d.pt" % n_bins)
             else:
-                torch.save(net.state_dict(), "../Saved_models/ci-unet-%d.pt" % n_bins)
+                torch.save(net.state_dict(), "./Saved_Models/ci-unet-%d.pt" % n_bins)
 
         # Handle the learning rate scheduler.
         if i % DECAY_EPOCHS == 0 and i != 0:

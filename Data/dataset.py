@@ -23,8 +23,11 @@ def load_rir(filepath, target_fs):
     return rir
 
 def get_direct_rir(rir, fs):
-    num_sample = int((0.004 * fs) - 1)
-    return rir[:num_sample]
+    max_val = np.max(rir)
+    peaks = signal.find_peaks(rir, prominence=max_val/4) 
+    delay = int((0.0037 * fs) - 1)
+    dir_len = int(peaks[0][0] + delay)
+    return rir[:dir_len]
 
 def apply_reverberation(x, rir):
     rev_signal = signal.convolve(x, rir)

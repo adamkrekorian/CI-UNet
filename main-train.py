@@ -22,14 +22,14 @@ if __name__=="__main__":
     print("Extracting train set...")
     train_dataset = extract_dataset(directory_train, rir_directory_train,
                                     100, 24,
-                                    training_set=True, mask=True)
+                                    training_set=True, mask=False)
     print("Extracting test set...")
     test_dataset = extract_dataset(directory_test, rir_directory_test,
                                    140, 1,
-                                   training_set=False, mask=True)
+                                   training_set=False, mask=False)
     print("Training")
     # Train
-    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=True)
+    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=False, epochs=20)
 
     
 
