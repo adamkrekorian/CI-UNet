@@ -22,10 +22,10 @@ def load_rir(filepath, target_fs):
         rir = rir[0::fsx]
     return rir
 
-def get_direct_rir(rir, fs):
+def get_direct_rir(rir, fs, delay_time=0.002):
     max_val = np.max(rir)
     peaks = signal.find_peaks(rir, prominence=max_val/4) 
-    delay = int((0.0037 * fs) - 1)
+    delay = int((delay_time * fs) - 1)
     dir_len = int(peaks[0][0] + delay)
     return rir[:dir_len]
 
