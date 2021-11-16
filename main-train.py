@@ -7,6 +7,8 @@ N_BINS = 64
 fs = 16000
 
 if __name__=="__main__":
+    masking = True
+    
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print("device = {}".format(device))
@@ -22,14 +24,14 @@ if __name__=="__main__":
     print("Extracting train set...")
     train_dataset = extract_dataset(directory_train, rir_directory_train,
                                     100, 24,
-                                    training_set=True, mask=False)
+                                    training_set=True, mask=masking)
     print("Extracting test set...")
     test_dataset = extract_dataset(directory_test, rir_directory_test,
                                    140, 1,
-                                   training_set=False, mask=False)
+                                   training_set=False, mask=masking)
     print("Training")
     # Train
-    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=False, epochs=20)
+    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=masking, epochs=20)
 
     
 
