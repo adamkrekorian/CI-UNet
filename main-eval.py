@@ -1,14 +1,18 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from scipy.io import wavfile
 import torch
 
 from pystoi import stoi
 from pesq import pesq
 
+import matlab
+import matlab.engine
+
 from Model_Classes.ci_unet_class import CI_Unet_64
 from Data.dataset import extract_dataset
-from Eval.reconstruct import recreate_from_spect_set
+from Eval.reconstruct import recreate_from_spect_set, create_22_channel_spect_set
 
 N_BINS = 64
 fs = 16000
@@ -53,9 +57,9 @@ def plot_example_spects(testing_data, mask=False):
     plt.xlabel("Time Domain")
     plt.ylabel("Frequency Domain")
     if mask:
-        plt.savefig("res-eval-64-bm-%d.png" % i)
+        plt.savefig("./Eval/Results/res-eval-64-bm-%d.png" % i)
     else:
-        plt.savefig("res-eval-64-%d.png" % i)
+        plt.savefig("./Eval/Results/res-eval-64-%d.png" % i)
     
 
 
@@ -86,7 +90,7 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Reverberant Signal")
 
             # Save .wav file of speech
-            wavfile.write("full_reverb_speech.wav", fs, full_rev)
+            wavfile.write("./Eval/Results/full_reverb_speech.wav", fs, full_rev)
 
             plt.subplot(3, 1, 2)
             plt.plot(rec)
@@ -96,13 +100,13 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
                 plt.title("Recreated Signal (IBM)")
                 
                 # Save .wav file of speech
-                wavfile.write("rec_mask_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_mask_speech.wav", fs, rec)
                 
             else:
                 plt.title("Recreated Signal")
                 
                 # Save .wav file of speech
-                wavfile.write("rec_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_speech.wav", fs, rec)
                 
             plt.subplot(3, 1, 3)
             plt.plot(dir_path)
@@ -111,12 +115,12 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Direct Path Signal")
 
             # Save .wav file of speech
-            wavfile.write("dir_path_speech.wav", fs, dir_path)
+            wavfile.write("./Eval/Results/dir_path_speech.wav", fs, dir_path)
 
             if mask:
-                plt.savefig("res-eval-64-rec-comp-bm-%d.png" % i)
+                plt.savefig("./Eval/Results/res-eval-64-rec-comp-bm-%d.png" % i)
             else:
-                plt.savefig("res-eval-64-rec-comp-%d.png" % i)
+                plt.savefig("./Eval/Results/res-eval-64-rec-comp-%d.png" % i)
 
                 
         stoi_rec_sum += stoi(dir_path, rec, fs)
@@ -143,27 +147,103 @@ def plot_intel_res(stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg, mask=
     print(stoi_values)
     print(pesq_values)
     
-    plt.figure(figsize=(20,10))
+    fig, axs = plt.subplots(1, 2, figsize=(10,5))
     
-    plt.subplot(1, 2, 1)
-    plt.bar(labels, stoi_values, color=colors)
-    plt.xlabel("Signal")
-    plt.ylabel("STOI Value")
-    plt.title("Mean STOI results (N = 140)")
-    plt.ylim((0, 1))
-
-    plt.subplot(1, 2, 2)
-    plt.bar(labels, pesq_values, color=colors)
-    plt.xlabel("Signal")
-    plt.ylabel("PESQ Value")
-    plt.title("Mean PESQ results (N = 140)")
-    plt.ylim((0.5, 1.5))
-
+    rect0 = axs[0].bar(labels, stoi_values, color=colors)
+    axs[0].set_xlabel("Signal")
+    axs[0].set_ylabel("STOI Value")
+    axs[0].set_title("Mean STOI results (N = 140)")
+    axs[0].set_ylim((0, 1))
+    for i, v in enumerate(stoi_values):
+        xloc = rect0[i].get_x() + rect0[i].get_width() / 2
+        yloc = 1.05 * rect0[i].get_height()
+        axs[0].text(xloc, yloc, f"{v:.3f}")
+    
+    rect1 = axs[1].bar(labels, pesq_values, color=colors)
+    axs[1].set_xlabel("Signal")
+    axs[1].set_ylabel("PESQ Value")
+    axs[1].set_title("Mean PESQ results (N = 140)")
+    axs[1].set_ylim((0.5, 1.5))
+    for i, v in enumerate(pesq_values):
+        xloc = rect1[i].get_x() + rect1[i].get_width() / 2
+        yloc = 1.05 * rect1[i].get_height()
+        axs[1].text(xloc, yloc, f"{v:.3f}")
+    
+    
     if mask:
-        plt.savefig("intel-eval-bm-64.png")
+        plt.savefig("./Eval/Results/intel-eval-bm-64.png")
     else:
-        plt.savefig("intel-eval-64.png")
+        plt.savefig("./Eval/Results/intel-eval-64.png")
 
+
+def compute_ecm_metrics(directory, rir_directory, net, mask=False):
+    rec_spects, dir_spects, full_spects = create_22_channel_spect_set(directory, rir_directory, net, mask=mask)
+    ecm_rec_sum = 0
+    ecm_rev_sum = 0
+
+    num_nan = 0
+    
+    eng = matlab.engine.start_matlab()
+    
+    for i in range(len(rec_spects)):
+        dir_spect = dir_spects[i]
+        rec_spect = rec_spects[i]
+        full_spect = full_spects[i]
+    
+        dir_spect /= np.max(dir_spect)
+        rec_spect /= np.max(rec_spect)
+        full_spect /= np.max(full_spect)
+
+        if i == 0:
+            fig, asx = plt.subplots(3, 1, figsize=(20,20))
+        
+            asx[0].imshow(full_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
+            asx[0].set_xlabel("Frames")
+            asx[0].set_ylabel("Channels")
+            asx[0].set_title("Reverberant Spectrogram")
+            asx[0].set_aspect('auto')
+            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[0])
+            
+            asx[1].imshow(rec_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
+            asx[1].set_xlabel("Frames")
+            asx[1].set_ylabel("Channels")
+            if mask:
+                asx[1].set_title("Recreated Spectrogram (IBM)")                
+            else:
+                asx[1].set_title("Recreated Spectrogram")
+            asx[1].set_aspect('auto')
+            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[1])
+            
+            asx[2].imshow(dir_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
+            asx[2].set_xlabel("Frames")
+            asx[2].set_ylabel("Channels")
+            asx[2].set_title("Direct Path Spectrogram")
+            asx[2].set_aspect('auto')
+            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[1])
+            
+            if mask:
+                plt.savefig("./Eval/Results/res-eval-64-rec-spect-comp-bm-%d.png" % i)
+            else:
+                plt.savefig("./Eval/Results/res-eval-64-rec-spect-comp-%d.png" % i)
+
+        dir_spect_ml = matlab.double(dir_spect.tolist())
+        rec_spect_ml = matlab.double(rec_spect.tolist())
+        full_spect_ml = matlab.double(full_spect.tolist())
+
+        fs_ml = matlab.double([500])
+
+        ecm_rec_val = eng.calculateEcm(dir_spect_ml, rec_spect_ml, fs_ml, 'mean')
+        ecm_rev_val = eng.calculateEcm(dir_spect_ml, full_spect_ml, fs_ml, 'mean')
+
+        if np.isnan(ecm_rec_val):
+            num_nan += 1
+            
+        ecm_rec_sum += np.nan_to_num(ecm_rec_val)
+        ecm_rev_sum += np.nan_to_num(ecm_rev_val)
+
+    ecm_rec_avg = ecm_rec_sum / (len(rec_spects) - num_nan)
+    ecm_rev_avg = ecm_rev_sum / (len(rec_spects) - num_nan)
+    return [ecm_rec_avg, ecm_rev_avg]
     
 if __name__=="__main__":
     masking = False
@@ -184,18 +264,14 @@ if __name__=="__main__":
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
     # Extract Dataset
-    test_dataset = extract_dataset(directory_test, rir_directory_test,
-                                   140, 1,
-                                   training_set=False, mask=masking)
+    # test_dataset = extract_dataset(directory_test, rir_directory_test,
+    #                               140, 1,
+    #                               training_set=False, mask=masking)
 
     # Plot Example Spect Comparison
-    plot_example_spects(test_dataset, mask=masking)
+    # plot_example_spects(test_dataset, mask=masking)
 
-    intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
-    plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3], mask=masking)
-
-    
-
-
-
-    
+    # intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
+    # plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3], mask=masking)
+    ecm_res = compute_ecm_metrics(directory_test, rir_directory_test, net, mask=masking)
+    print(ecm_res)
