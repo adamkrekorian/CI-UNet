@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="42324b9f-ff99-4f07-9d9b-7f82b9f69966" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/CI-UNet.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/activate" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/activate.csh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/activate.fish" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/easy_install" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/easy_install-3.6" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/pip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/pip3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/pip3.6" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/python" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/bin/python3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/pyvenv.cfg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ci-env/requirements.txt" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="ProjectId" id="21k7sR4tvZDGzorOzKxtawDidH8" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="42324b9f-ff99-4f07-9d9b-7f82b9f69966" name="Changes" comment="" />
+      <created>1638473437633</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1638473437633</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
+  </component>
+</project>
