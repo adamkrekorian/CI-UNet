@@ -195,36 +195,33 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
         full_spect /= np.max(full_spect)
 
         if i == 0:
-            fig, asx = plt.subplots(3, 1, figsize=(20,20))
+            temp_spects = [full_spect, rec_spect, dir_spect]
+            fig, axs = plt.subplots(3, 1, figsize=(20,20))
         
-            asx[0].imshow(full_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
-            asx[0].set_xlabel("Frames")
-            asx[0].set_ylabel("Channels")
-            asx[0].set_title("Reverberant Spectrogram")
-            asx[0].set_aspect('auto')
-            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[0])
+            for ax, temp_sp in zip(axs, temp_spects):
+                #temp_im = ax.imshow(temp_sp, vmin=0, vmax=np.max(temp_sp), cmap=plt.get_cmap("jet"))
+                temp_im = ax.imshow(temp_sp, cmap=plt.get_cmap("jet"))
+                ax.set_xlabel("Frames")
+                ax.set_ylabel("Channels")
+                ax.set_aspect('auto')
+                fig.colorbar(temp_im, ax=ax)
             
-            asx[1].imshow(rec_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
-            asx[1].set_xlabel("Frames")
-            asx[1].set_ylabel("Channels")
-            if mask:
-                asx[1].set_title("Recreated Spectrogram (IBM)")                
-            else:
-                asx[1].set_title("Recreated Spectrogram")
-            asx[1].set_aspect('auto')
-            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[1])
-            
-            asx[2].imshow(dir_spect, vmin=-1, vmax=1, cmap=plt.get_cmap("jet"))
-            asx[2].set_xlabel("Frames")
-            asx[2].set_ylabel("Channels")
-            asx[2].set_title("Direct Path Spectrogram")
-            asx[2].set_aspect('auto')
-            #fig.colorbar(cm.ScalarMappable(norm=norm, cmap=cmap), ax=asx[1])
+            axs[0].set_title("Reverberant Spectrogram")
             
             if mask:
-                plt.savefig("./Eval/Results/res-eval-64-rec-spect-comp-bm-%d.png" % i)
+                axs[1].set_title("Recreated Spectrogram (IBM)")                
             else:
-                plt.savefig("./Eval/Results/res-eval-64-rec-spect-comp-%d.png" % i)
+                axs[1].set_title("Recreated Spectrogram")
+        
+            axs[2].set_title("Direct Path Spectrogram")
+
+            
+            if mask:
+                fig_filename = "./Eval/Results/res-eval-64-rec-spect-comp-bm-%d.png" % i
+            else:
+                fig_filename = "./Eval/Results/res-eval-64-rec-spect-comp-%d.png" % i
+
+            plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
 
         dir_spect_ml = matlab.double(dir_spect.tolist())
         rec_spect_ml = matlab.double(rec_spect.tolist())
@@ -234,6 +231,12 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
 
         ecm_rec_val = eng.calculateEcm(dir_spect_ml, rec_spect_ml, fs_ml, 'mean')
         ecm_rev_val = eng.calculateEcm(dir_spect_ml, full_spect_ml, fs_ml, 'mean')
+
+        if i == 0:
+            np.savetxt('rec_spect.csv', rec_spect, delimiter=',')
+            np.savetxt('full_spect.csv', full_spect, delimiter=',')
+            #vocode_rec = eng.vocodeCIStimulus(rec_spect_ml)
+            #vocode_rev = eng.vocodeCIStimulus(full_spect_ml)
 
         if np.isnan(ecm_rec_val):
             num_nan += 1

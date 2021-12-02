@@ -25,8 +25,10 @@ def apply_net_to_spect(net, spect, scl_vals, mask=False):
     if mask:
         net_output[net_output < 0.5] = 0
         net_output[net_output >= 0.5] = 1
+        spect = ((spect+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
         net_output = spect * net_output
-    net_output = ((net_output+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
+    else:
+        net_output = ((net_output+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
     return net_output
 
 def pad_spect(spect):
@@ -45,11 +47,11 @@ def recreate_from_spect(net_spect, phase, fs=16000):
 
 def load_bin_weights():
     bin_weight_path = "./Eval/bin_weights.csv"
-    bin_weights = pd.read_csv(bin_weight_path).to_numpy()
+    bin_weights = pd.read_csv(bin_weight_path, header=None).to_numpy()
     return bin_weights
 
 def apply_bin_weights(net_spect, bin_weights):
-    power_spect = np.multiply(net_spect, np.conj(net_spect)) 
+    power_spect = np.multiply(net_spect, np.conj(net_spect))
     weighted_sum_spect = np.matmul(bin_weights, power_spect)
     spect_22 = np.abs(np.sqrt(weighted_sum_spect))
     return spect_22
@@ -150,13 +152,13 @@ def create_22_channel_spect_set(directory, rir_directory, net, num_files=140, nu
                     break
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
-                    dir_path_spect, _, _ = dataset.create_spectrogram(f, dir_rir)
+                    dir_path_spect, _, _ = dataset.create_spectrogram(f, dir_rir, norm=False)
                     sig_len = np.shape(dir_path_spect)[1]
                     dir_path_spect = pad_spect(dir_path_spect)
                     #print(np.shape(dir_path_spect))
                     dir_path_spect_w = apply_bin_weights(dir_path_spect, bin_weights)
                     
-                    full_rev_spect, _, _ = dataset.create_spectrogram(f, rir)
+                    full_rev_spect, _, _ = dataset.create_spectrogram(f, rir, norm=False)
                     full_rev_spect = full_rev_spect[:, :sig_len]
                     full_rev_spect = pad_spect(full_rev_spect)
                     #print(np.shape(full_rev_spect))
@@ -167,9 +169,9 @@ def create_22_channel_spect_set(directory, rir_directory, net, num_files=140, nu
                     #print(np.shape(rec_spect))
                     rec_spect_w = apply_bin_weights(rec_spect, bin_weights)
 
-                    #print(np.shape(dir_path_spect_w))
-                    #print(np.shape(full_rev_spect_w))
-                    #print(np.shape(rec_spect_w))
+                    #print(np.min(dir_path_spect_w))
+                    #print(np.min(full_rev_spect_w))
+                    #print(np.min(rec_spect_w))
                     
                     dir_path_22_spects.append(dir_path_spect_w)
                     full_rev_22_spects.append(full_rev_spect_w)
