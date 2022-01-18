@@ -10,11 +10,17 @@ import pandas as pd
 from scipy.io import wavfile
 from scipy import signal
 
+import matplotlib.pyplot as plt
+
 import Data.dataset as dataset
 
 N_BINS = 64
 fs = 16000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+
+def rescale_spect(spect, scl_vals):
+    return 0
 
 def apply_net_to_spect(net, spect, scl_vals, mask=False):
     spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect), 0), 0)
@@ -30,6 +36,80 @@ def apply_net_to_spect(net, spect, scl_vals, mask=False):
     else:
         net_output = ((net_output+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
     return net_output
+
+def apply_net_to_full_spect(net, spect, scl_vals, mask=False):
+    pad_amount = N_BINS - (spect.shape[1] % N_BINS)
+    if pad_amount != 0:
+        zero_pad = np.zeros((N_BINS, pad_amount))
+        spect = np.concatenate((spect, zero_pad), axis=1)
+    N = (spect.shape[1] // N_BINS)
+    spect_list = np.split(spect, N, axis=1)
+    full_signal_spect = np.zeros((np.shape(spect)[0], 1))
+    for i in range(N):
+        spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect_list[i]), 0), 0)
+        with torch.no_grad():
+            net_output = net(spect_norm_tensor.to(device))
+        net_output = np.squeeze(net_output).cpu().numpy()
+        net_output = np.nan_to_num(net_output)
+        full_signal_spect = np.append(full_signal_spect, net_output, axis=1)
+    full_signal_spect = full_signal_spect[:, 1:spect.shape[1]+1]
+    return full_signal_spect
+
+def test_norm(file, rir, net, ind):
+    fs, x = wavfile.read(file)
+    x_rev = dataset.apply_reverberation(x, rir)
+    window_len = N_BINS*2
+    hamming_window = signal.windows.hamming(window_len)
+    f, t, stft_out = signal.stft(x_rev, fs, window=hamming_window, nfft=N_BINS*2, nperseg=N_BINS*2, noverlap=window_len / 2)
+    num_extra_bands = stft_out.shape[0] - N_BINS
+    stft_out = stft_out[:-num_extra_bands, :] if num_extra_bands > 0 else stft_out
+    spect = np.abs(stft_out)
+    spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
+    norm_spect, min_, max_ = dataset.normalize(spect)
+    net_spect = apply_net_to_full_spect(net, norm_spect, None)
+    unnorm_spect = ((net_spect+1)/2)*(max_ - min_) + min_
+
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10), dpi=200)    
+    
+    temp_im = axs[0].imshow(spect, cmap=plt.get_cmap("jet"))
+    axs[0].set_xlabel("Frames")
+    axs[0].set_ylabel("Channels")
+    axs[0].set_aspect('auto')
+    fig.colorbar(temp_im, ax=axs[0])
+    axs[0].set_title("Original Spectrogram")
+
+    temp_im = axs[1].imshow(net_spect, cmap=plt.get_cmap("jet"))
+    axs[1].set_xlabel("Frames")
+    axs[1].set_ylabel("Channels")
+    axs[1].set_aspect('auto')
+    fig.colorbar(temp_im, ax=axs[1])
+    axs[1].set_title("Net Spectrogram")
+
+    temp_im = axs[2].imshow(unnorm_spect, cmap=plt.get_cmap("jet"))
+    axs[2].set_xlabel("Frames")
+    axs[2].set_ylabel("Channels")
+    axs[2].set_aspect('auto')
+    fig.colorbar(temp_im, ax=axs[2])
+    axs[2].set_title("Unnormalized Spectrogram")
+
+    plt.savefig(f"./Eval/Results/Norm_Comp/comp_{ind}", dpi=200, bbox_inches="tight")
+    
+def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
+    for i, rir_filename in enumerate(os.listdir(rir_directory)):
+        if i == num_rirs:
+            break
+        r = os.path.join(rir_directory, rir_filename)
+        if os.path.isfile(r):
+            rir = dataset.load_rir(r, fs)
+            dir_rir = dataset.get_direct_rir(rir, 16000)
+    for i, filename in enumerate(os.listdir(directory)):
+        if i == num_files:
+            break
+        f = os.path.join(directory, filename)
+        if os.path.isfile(f):
+            test_norm(f, dir_rir, net, i)
+        else:
+            num_files += 1
 
 def pad_spect(spect):
     zero_pad = np.zeros((1, np.shape(spect)[1]))

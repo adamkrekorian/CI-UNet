@@ -9,8 +9,11 @@ import scipy.io as sio
 from scipy.io import wavfile
 from scipy import signal
 
+import matplotlib.pyplot as plt
+
 N_BINS = 64
 fs = 16000
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Dataset Extraction
 def load_rir(filepath, target_fs):
@@ -35,10 +38,10 @@ def apply_reverberation(x, rir):
 
 def normalize(spect):
     feature_vector = spect.ravel()
-    min_x = np.min(feature_vector)
-    max_x = np.max(feature_vector)
-    spect = 2*((spect - min_x)/(max_x-min_x)) - 1
-    return spect, min_x, max_x
+    min_ = np.min(feature_vector)
+    max_ = np.max(feature_vector)
+    spect = 2*((spect - min_)/(max_-min_)) - 1
+    return spect, min_, max_
 
 def add_noise_at_20db(spect):
     spect[spect == 0] = 1e-40
@@ -55,10 +58,10 @@ def create_spectrogram(file, rir, norm=True):
     spect = np.abs(stft_out)
     if norm:
         spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
-        spect, min_x, max_x = normalize(spect)
-        return spect, np.angle(stft_out), [min_x, max_x]
+        spect, min_, max_ = normalize(spect)
+        return spect, np.angle(stft_out), [min_, max_]
     return spect, np.angle(stft_out), None
-
+    
 def spect_train_set_for_rir(directory, rir, num_files=5):
     data = np.zeros((N_BINS,1))
     for i, filename in enumerate(os.listdir(directory)):
