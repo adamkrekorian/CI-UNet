@@ -12,7 +12,8 @@ import matlab.engine
 
 from Model_Classes.ci_unet_class import CI_Unet_64
 from Data.dataset import extract_dataset
-from Eval.reconstruct import recreate_from_spect_set, create_22_channel_spect_set, norm_comp_set
+from Eval.reconstruct import recreate_from_spect_set, create_22_channel_spect_set
+from Eval.testing import norm_comp_set
 
 N_BINS = 64
 fs = 16000
@@ -266,4 +267,4 @@ if __name__=="__main__":
     directory_test = "./Data/Speech_Files/Testing/"
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
-    norm_comp_set(directory_test, rir_directory_test, net, num_files=2)
+    norm_comp_set(directory_test, rir_directory_test, net, num_files=20)

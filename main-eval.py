@@ -267,14 +267,16 @@ if __name__=="__main__":
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
     # Extract Dataset
-    # test_dataset = extract_dataset(directory_test, rir_directory_test,
-    #                               140, 1,
-    #                               training_set=False, mask=masking)
+    print("Extracting testing set...")
+    test_dataset = extract_dataset(directory_test, rir_directory_test,
+                                   140, 1,
+                                   training_set=False, mask=masking)
 
     # Plot Example Spect Comparison
-    # plot_example_spects(test_dataset, mask=masking)
+    plot_example_spects(test_dataset, mask=masking)
 
-    # intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
-    # plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3], mask=masking)
+    intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
+    plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3], mask=masking)
+    print("Computing ECM Metrics...")
     ecm_res = compute_ecm_metrics(directory_test, rir_directory_test, net, mask=masking)
     print(ecm_res)

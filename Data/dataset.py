@@ -40,27 +40,40 @@ def normalize(spect):
     feature_vector = spect.ravel()
     min_ = np.min(feature_vector)
     max_ = np.max(feature_vector)
-    spect = 2*((spect - min_)/(max_-min_)) - 1
+    spect = 2 * ((spect - min_) / (max_- min_)) - 1
     return spect, min_, max_
+
+def zero_pad(spect, pad_amount):
+    if pad_amount != 0:
+        spect = np.pad(spect, ((0, 0), (0, pad_amount)), 'constant')
+    return spect
 
 def add_noise_at_20db(spect):
     spect[spect == 0] = 1e-40
     return spect
 
+def ci_stft(x, fs=fs, N_BINS=N_BINS):
+    window_len = N_BINS*2
+    hamming_window = signal.windows.hamming(window_len)
+    f, t, stft_out = signal.stft(x, fs, window=hamming_window,
+                                 nfft=N_BINS*2, nperseg=N_BINS*2,
+                                 noverlap=window_len / 2)
+    return stft_out
+    
+
 def create_spectrogram(file, rir, norm=True):
     fs, x = wavfile.read(file)
     x_rev = apply_reverberation(x, rir)
-    window_len = N_BINS*2
-    hamming_window = signal.windows.hamming(window_len)
-    f, t, stft_out = signal.stft(x_rev, fs, window=hamming_window, nfft=N_BINS*2, nperseg=N_BINS*2, noverlap=window_len / 2)
+    stft_out = ci_stft(x_rev)
     num_extra_bands = stft_out.shape[0] - N_BINS
     stft_out = stft_out[:-num_extra_bands, :] if num_extra_bands > 0 else stft_out
     spect = np.abs(stft_out)
+    phase = np.angle(stft_out)
     if norm:
         spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
-        spect, min_, max_ = normalize(spect)
-        return spect, np.angle(stft_out), [min_, max_]
-    return spect, np.angle(stft_out), None
+        spect_norm, min_, max_ = normalize(spect)
+        return spect_norm, phase, [min_, max_]
+    return spect, phase, None
     
 def spect_train_set_for_rir(directory, rir, num_files=5):
     data = np.zeros((N_BINS,1))
@@ -81,10 +94,8 @@ def spect_train_set_for_rir(directory, rir, num_files=5):
 def spect_test_datapoint(file, rir):
     spect, phase, _ = create_spectrogram(file, rir)
     pad_amount = N_BINS - (spect.shape[1] % N_BINS)
-    if pad_amount != 0:
-        zero_pad = np.zeros((N_BINS, pad_amount))
-        spect = np.concatenate((spect, zero_pad), axis=1)
-        phase = np.concatenate((phase, zero_pad), axis=1)
+    spect = zero_pad(spect, pad_amount)
+    phase = zero_pad(phase, pad_amount)
     N = (spect.shape[1] // N_BINS)
     spect_list = np.split(spect, N, axis=1)
     phase_list = np.split(phase, N, axis=1)

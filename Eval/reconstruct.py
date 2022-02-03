@@ -12,7 +12,7 @@ from scipy import signal
 
 import matplotlib.pyplot as plt
 
-import Data.dataset as dataset
+import Data.dataset as ds
 
 N_BINS = 64
 fs = 16000
@@ -20,96 +20,43 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def rescale_spect(spect, scl_vals):
-    return 0
+    max_, min_ = scl_vals
+    return ((spect + 1) / 2) * (max_ - min_) + min_ 
 
-def apply_net_to_spect(net, spect, scl_vals, mask=False):
+
+def apply_net(net, spect):
     spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect), 0), 0)
     with torch.no_grad():
         net_output = net(spect_norm_tensor.to(device))
     net_output = np.squeeze(net_output).cpu().numpy()
     net_output = np.nan_to_num(net_output)
+    return net_output
+
+
+def apply_net_to_spect(net, spect, scl_vals, mask=False, rescale=False):
+    net_output = apply_net(net, spect)
     if mask:
         net_output[net_output < 0.5] = 0
         net_output[net_output >= 0.5] = 1
-        spect = ((spect+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
+        spect = rescale_spect(spect, scl_vals) if rescale else spect
         net_output = spect * net_output
     else:
-        net_output = ((net_output+1)/2)*(scl_vals[1] - scl_vals[0]) + scl_vals[0]
+        net_output = rescale_spect(net_output, scl_vals) if rescale else net_output
     return net_output
 
-def apply_net_to_full_spect(net, spect, scl_vals, mask=False):
+
+def apply_net_to_full_spect(net, spect, scl_vals, mask=False, rescale=False):
     pad_amount = N_BINS - (spect.shape[1] % N_BINS)
-    if pad_amount != 0:
-        zero_pad = np.zeros((N_BINS, pad_amount))
-        spect = np.concatenate((spect, zero_pad), axis=1)
-    N = (spect.shape[1] // N_BINS)
+    spect = ds.zero_pad(spect, pad_amount)
+    N = spect.shape[1] // N_BINS
     spect_list = np.split(spect, N, axis=1)
     full_signal_spect = np.zeros((np.shape(spect)[0], 1))
-    for i in range(N):
-        spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect_list[i]), 0), 0)
-        with torch.no_grad():
-            net_output = net(spect_norm_tensor.to(device))
-        net_output = np.squeeze(net_output).cpu().numpy()
-        net_output = np.nan_to_num(net_output)
+    for sp in spect_list:
+        net_output = apply_net_to_spect(net, sp, scl_vals, mask, rescale)
         full_signal_spect = np.append(full_signal_spect, net_output, axis=1)
-    full_signal_spect = full_signal_spect[:, 1:spect.shape[1]+1]
+    full_signal_spect = full_signal_spect[:, 1:-pad_amount]
     return full_signal_spect
 
-def test_norm(file, rir, net, ind):
-    fs, x = wavfile.read(file)
-    x_rev = dataset.apply_reverberation(x, rir)
-    window_len = N_BINS*2
-    hamming_window = signal.windows.hamming(window_len)
-    f, t, stft_out = signal.stft(x_rev, fs, window=hamming_window, nfft=N_BINS*2, nperseg=N_BINS*2, noverlap=window_len / 2)
-    num_extra_bands = stft_out.shape[0] - N_BINS
-    stft_out = stft_out[:-num_extra_bands, :] if num_extra_bands > 0 else stft_out
-    spect = np.abs(stft_out)
-    spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
-    norm_spect, min_, max_ = dataset.normalize(spect)
-    net_spect = apply_net_to_full_spect(net, norm_spect, None)
-    unnorm_spect = ((net_spect+1)/2)*(max_ - min_) + min_
-
-    fig, axs = plt.subplots(3, 1, figsize=(10, 10), dpi=200)    
-    
-    temp_im = axs[0].imshow(spect, cmap=plt.get_cmap("jet"))
-    axs[0].set_xlabel("Frames")
-    axs[0].set_ylabel("Channels")
-    axs[0].set_aspect('auto')
-    fig.colorbar(temp_im, ax=axs[0])
-    axs[0].set_title("Original Spectrogram")
-
-    temp_im = axs[1].imshow(net_spect, cmap=plt.get_cmap("jet"))
-    axs[1].set_xlabel("Frames")
-    axs[1].set_ylabel("Channels")
-    axs[1].set_aspect('auto')
-    fig.colorbar(temp_im, ax=axs[1])
-    axs[1].set_title("Net Spectrogram")
-
-    temp_im = axs[2].imshow(unnorm_spect, cmap=plt.get_cmap("jet"))
-    axs[2].set_xlabel("Frames")
-    axs[2].set_ylabel("Channels")
-    axs[2].set_aspect('auto')
-    fig.colorbar(temp_im, ax=axs[2])
-    axs[2].set_title("Unnormalized Spectrogram")
-
-    plt.savefig(f"./Eval/Results/Norm_Comp/comp_{ind}", dpi=200, bbox_inches="tight")
-    
-def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
-    for i, rir_filename in enumerate(os.listdir(rir_directory)):
-        if i == num_rirs:
-            break
-        r = os.path.join(rir_directory, rir_filename)
-        if os.path.isfile(r):
-            rir = dataset.load_rir(r, fs)
-            dir_rir = dataset.get_direct_rir(rir, 16000)
-    for i, filename in enumerate(os.listdir(directory)):
-        if i == num_files:
-            break
-        f = os.path.join(directory, filename)
-        if os.path.isfile(f):
-            test_norm(f, dir_rir, net, i)
-        else:
-            num_files += 1
 
 def pad_spect(spect):
     zero_pad = np.zeros((1, np.shape(spect)[1]))
@@ -122,8 +69,10 @@ def recreate_from_spect(net_spect, phase, fs=16000):
     net_stft = np.concatenate((net_stft[:-1], np.conj(net_stft[-1:0:-1, :])))
     window_len = N_BINS*2
     hamming_window = signal.windows.hamming(window_len)
-    _, reconstructed_signal = signal.istft(net_stft, fs=fs, window=hamming_window, nfft=N_BINS*2, nperseg=N_BINS*2, noverlap=window_len / 2, input_onesided=False)
-    return reconstructed_signal
+    _, rec_signal = signal.istft(net_stft, fs=fs, window=hamming_window,
+                                 nfft=N_BINS*2, nperseg=N_BINS*2,
+                                 noverlap=window_len / 2, input_onesided=False)
+    return rec_signal
 
 def load_bin_weights():
     bin_weight_path = "./Eval/bin_weights.csv"
@@ -147,23 +96,22 @@ def vocode_from_spect(net_spect, phase, fs=16000):
     vocoded_signal = vocode_spect(spect_22)
     return vocoded_signal
 
-def recreate_signal_datapoint(file, rir, net, sig_len, mask=False):
-    spect, phase, scl_vals = dataset.create_spectrogram(file, rir)
+def recreate_signal(file, rir, net, sig_len, mask=False):
+    spect, phase, scl_vals = ds.create_spectrogram(file, rir)
     pad_amount = N_BINS - (spect.shape[1] % N_BINS)
-    if pad_amount != 0:
-        zero_pad = np.zeros((N_BINS, pad_amount))
-        spect = np.concatenate((spect, zero_pad), axis=1)
-        phase = np.concatenate((phase, zero_pad), axis=1)
-    N = (spect.shape[1] // N_BINS)
+    spect = ds.zero_pad(spect, pad_amount)
+    phase = ds.zero_pad(phase, pad_amount)
+    N = spect.shape[1] // N_BINS
     spect_list = np.split(spect, N, axis=1)
     phase_list = np.split(phase, N, axis=1)
-    reconstructed_signal = []
-    for i in range(N):
-        net_spect = apply_net_to_spect(net, spect_list[i], scl_vals, mask=mask)
-        reconstructed_signal.extend(recreate_from_spect(net_spect, phase_list[i]))
-    if (len(reconstructed_signal) < sig_len):
-        reconstructed_signal = np.pad(reconstructed_signal, (0, sig_len - len(reconstructed_signal)), 'constant')
-    return reconstructed_signal[:sig_len]
+    rec_signal = []
+    for sp, ph in zip(spect_list, phase_list):
+        net_spect = apply_net_to_spect(net, sp, scl_vals, mask=mask)
+        rec_spect
+        rec_signal.extend(recreate_from_spect(net_spect, ph))
+    if (len(rec_signal) < sig_len):
+        rec_signal = np.pad(rec_signal, (0, sig_len - len(rec_signal)), 'constant')
+    return rec_signal[:sig_len]
 
 def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_rirs=1, fs=16000, mask=False):
     reconstructed_signals = []
@@ -174,17 +122,17 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_ri
             break
         r = os.path.join(rir_directory, rir_filename)
         if os.path.isfile(r):
-            rir = dataset.load_rir(r, fs)
-            dir_rir = dataset.get_direct_rir(rir, fs)
+            rir = ds.load_rir(r, fs)
+            dir_rir = ds.get_direct_rir(rir, fs)
             for i, filename in enumerate(os.listdir(directory)):
                 if i == num_files:
                     break
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
                     fs, x = wavfile.read(f)
-                    dir_path_signal = dataset.apply_reverberation(x, dir_rir)
+                    dir_path_signal = ds.apply_reverberation(x, dir_rir)
                     sig_len = len(dir_path_signal)
-                    full_rev_signal = dataset.apply_reverberation(x, rir)
+                    full_rev_signal = ds.apply_reverberation(x, rir)
                     rec_signal = recreate_signal_datapoint(f, rir, net, sig_len, mask=mask)
                     direct_path_signals.append(dir_path_signal)
                     full_rev_signals.append(full_rev_signal[:sig_len])
@@ -197,7 +145,7 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_ri
 
 
 def create_full_signal_spect(file, rir, net, sig_len, mask=False):
-    spect, phase, scl_vals = dataset.create_spectrogram(file, rir)
+    spect, phase, scl_vals = ds.create_spectrogram(file, rir)
     pad_amount = N_BINS - (spect.shape[1] % N_BINS)
     if pad_amount != 0:
         zero_pad = np.zeros((N_BINS, pad_amount))
@@ -225,33 +173,27 @@ def create_22_channel_spect_set(directory, rir_directory, net, num_files=140, nu
             break
         r = os.path.join(rir_directory, rir_filename)
         if os.path.isfile(r):
-            rir = dataset.load_rir(r, fs)
-            dir_rir = dataset.get_direct_rir(rir, fs)
+            rir = ds.load_rir(r, fs)
+            dir_rir = ds.get_direct_rir(rir, fs)
             for i, filename in enumerate(os.listdir(directory)):
                 if i == num_files:
                     break
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
-                    dir_path_spect, _, _ = dataset.create_spectrogram(f, dir_rir, norm=False)
+                    dir_path_spect, _, _ = ds.create_spectrogram(f, dir_rir, norm=False)
                     sig_len = np.shape(dir_path_spect)[1]
                     dir_path_spect = pad_spect(dir_path_spect)
-                    #print(np.shape(dir_path_spect))
                     dir_path_spect_w = apply_bin_weights(dir_path_spect, bin_weights)
                     
-                    full_rev_spect, _, _ = dataset.create_spectrogram(f, rir, norm=False)
+                    input_spect, _, scl_vals = ds.create_spectrogram(f, rir, norm=True)
+                    full_rev_spect = rescale_spect(input_spect, scl_vals)
                     full_rev_spect = full_rev_spect[:, :sig_len]
                     full_rev_spect = pad_spect(full_rev_spect)
-                    #print(np.shape(full_rev_spect))
                     full_rev_spect_w = apply_bin_weights(full_rev_spect, bin_weights)
-                    
-                    rec_spect = create_full_signal_spect(f, rir, net, sig_len, mask=mask)
-                    rec_spect = pad_spect(rec_spect)
-                    #print(np.shape(rec_spect))
-                    rec_spect_w = apply_bin_weights(rec_spect, bin_weights)
 
-                    #print(np.min(dir_path_spect_w))
-                    #print(np.min(full_rev_spect_w))
-                    #print(np.min(rec_spect_w))
+                    rec_spect = apply_net_to_full_spect(net, input_spect, scl_vals, mask, rescale=True)
+                    rec_spect = pad_spect(rec_spect)
+                    rec_spect_w = apply_bin_weights(rec_spect, bin_weights)
                     
                     dir_path_22_spects.append(dir_path_spect_w)
                     full_rev_22_spects.append(full_rev_spect_w)

@@ -202,17 +202,18 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
     INITIAL_LR = lr
     # Regularization
     REG = reg
+    # Momentum
+    MOMENTUM = 0.2
     # Total number of training epochs
     EPOCHS = epochs
     # Learning rate decay policy.
-    DECAY_EPOCHS = 2
-    DECAY = 0.8
+    DECAY_EPOCHS = 3
+    DECAY = 0.7
     # Loss function
     criterion = loss_f
     # Optimizer
     optimizer = torch.optim.Adam(net.parameters(),
-                             lr=INITIAL_LR,
-                             weight_decay=REG)
+                             lr=INITIAL_LR, weight_decay=REG)
     # Initialize dataloaders
     train_dataloader = DataLoader(train_data, batch_size=1, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True)
@@ -274,7 +275,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
         avg_loss = val_loss / len(test_dataloader)
         print("Validation loss: %.4f" % (avg_loss))
 
-        if avg_loss < best_val_loss:
+        if avg_loss < best_val_loss and i >= 10:
             print("Saving...")
             best_val_loss = avg_loss
             if mask:
