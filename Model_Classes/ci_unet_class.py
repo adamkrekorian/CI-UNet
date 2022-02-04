@@ -215,8 +215,8 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
     optimizer = torch.optim.Adam(net.parameters(),
                              lr=INITIAL_LR, weight_decay=REG)
     # Initialize dataloaders
-    train_dataloader = DataLoader(train_data, batch_size=1, shuffle=True)
-    test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True)
+    train_dataloader = DataLoader(train_data, batch_size=24, shuffle=True)
+    test_dataloader = DataLoader(test_data, batch_size=24, shuffle=True)
 
 
     global_step = 0

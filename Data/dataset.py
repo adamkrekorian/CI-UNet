@@ -1,4 +1,5 @@
 import os
+import sys
 
 import torch
 from torch.utils.data import Dataset
@@ -13,6 +14,7 @@ import matplotlib.pyplot as plt
 
 N_BINS = 64
 fs = 16000
+EPS = np.nextafter(0, 1)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # Dataset Extraction
@@ -37,6 +39,11 @@ def apply_reverberation(x, rir):
     return rev_signal[:len(x)]
 
 def normalize(spect):
+    #if np.min(np.ravel(spect)) <= 0:
+    #    print(np.min(np.ravel(spect))) 
+    spect[spect == 0.] = EPS
+    spect = np.log10(spect)
+    # spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
     feature_vector = spect.ravel()
     min_ = np.min(feature_vector)
     max_ = np.max(feature_vector)
@@ -70,7 +77,6 @@ def create_spectrogram(file, rir, norm=True):
     spect = np.abs(stft_out)
     phase = np.angle(stft_out)
     if norm:
-        spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
         spect_norm, min_, max_ = normalize(spect)
         return spect_norm, phase, [min_, max_]
     return spect, phase, None

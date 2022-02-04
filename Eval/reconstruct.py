@@ -14,15 +14,19 @@ import matplotlib.pyplot as plt
 
 import Data.dataset as ds
 
+import warnings
+warnings.filterwarnings("error")
+
 N_BINS = 64
 fs = 16000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 def rescale_spect(spect, scl_vals):
-    max_, min_ = scl_vals
-    return ((spect + 1) / 2) * (max_ - min_) + min_ 
-
+    min_, max_ = scl_vals
+    spect = ((spect + 1) / 2) * (max_ - min_) + min_ 
+    spect = np.power(10, spect)
+    return spect
 
 def apply_net(net, spect):
     spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect), 0), 0)
@@ -64,7 +68,8 @@ def pad_spect(spect):
     return spect
 
 def recreate_from_spect(net_spect, phase, fs=16000):
-    net_stft = np.exp(net_spect) * np.exp(1.0j * phase)
+    exp_phase = np.exp(1.0j * phase)
+    net_stft = net_spect * exp_phase
     net_stft = pad_spect(net_stft)
     net_stft = np.concatenate((net_stft[:-1], np.conj(net_stft[-1:0:-1, :])))
     window_len = N_BINS*2
@@ -106,8 +111,7 @@ def recreate_signal(file, rir, net, sig_len, mask=False):
     phase_list = np.split(phase, N, axis=1)
     rec_signal = []
     for sp, ph in zip(spect_list, phase_list):
-        net_spect = apply_net_to_spect(net, sp, scl_vals, mask=mask)
-        rec_spect
+        net_spect = apply_net_to_spect(net, sp, scl_vals, mask=mask, rescale=True)
         rec_signal.extend(recreate_from_spect(net_spect, ph))
     if (len(rec_signal) < sig_len):
         rec_signal = np.pad(rec_signal, (0, sig_len - len(rec_signal)), 'constant')
@@ -133,7 +137,7 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_ri
                     dir_path_signal = ds.apply_reverberation(x, dir_rir)
                     sig_len = len(dir_path_signal)
                     full_rev_signal = ds.apply_reverberation(x, rir)
-                    rec_signal = recreate_signal_datapoint(f, rir, net, sig_len, mask=mask)
+                    rec_signal = recreate_signal(f, rir, net, sig_len, mask=mask)
                     direct_path_signals.append(dir_path_signal)
                     full_rev_signals.append(full_rev_signal[:sig_len])
                     reconstructed_signals.append(rec_signal)
@@ -143,25 +147,6 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_ri
             num_rirs += 1
     return reconstructed_signals, direct_path_signals, full_rev_signals
 
-
-def create_full_signal_spect(file, rir, net, sig_len, mask=False):
-    spect, phase, scl_vals = ds.create_spectrogram(file, rir)
-    pad_amount = N_BINS - (spect.shape[1] % N_BINS)
-    if pad_amount != 0:
-        zero_pad = np.zeros((N_BINS, pad_amount))
-        spect = np.concatenate((spect, zero_pad), axis=1)
-        phase = np.concatenate((phase, zero_pad), axis=1)
-    N = (spect.shape[1] // N_BINS)
-    spect_list = np.split(spect, N, axis=1)
-    phase_list = np.split(phase, N, axis=1)
-    full_signal_spect = np.zeros((np.shape(spect)[0], 1))
-    for i in range(N):
-        net_spect = apply_net_to_spect(net, spect_list[i], scl_vals, mask=mask)
-        full_signal_spect = np.append(full_signal_spect, net_spect, axis=1)
-    full_signal_spect = full_signal_spect[:, 1:]
-    if (np.shape(full_signal_spect)[1] < sig_len):
-        full_signal_spect = np.pad(full_signal_spect, (np.shape(full_signal_spect)[0], sig_len - np.shape(full_signal_spect)[1]), 'constant')
-    return full_signal_spect[:, :sig_len]
 
 def create_22_channel_spect_set(directory, rir_directory, net, num_files=140, num_rirs=1, fs=16000, mask=False):
     rec_22_spects = []

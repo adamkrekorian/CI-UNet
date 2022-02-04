@@ -7,7 +7,7 @@ N_BINS = 64
 fs = 16000
 
 if __name__=="__main__":
-    masking = False
+    masking = True
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -31,7 +31,7 @@ if __name__=="__main__":
                                    training_set=False, mask=masking)
     print("Training")
     # Train
-    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=masking, epochs=20)
+    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=masking, reg=1e-2, epochs=20)
 
     
 

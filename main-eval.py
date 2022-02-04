@@ -246,10 +246,10 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
 
     ecm_rec_avg = ecm_rec_sum / (len(rec_spects) - num_nan)
     ecm_rev_avg = ecm_rev_sum / (len(rec_spects) - num_nan)
-    return [ecm_rec_avg, ecm_rev_avg]
+    return [ecm_rev_avg, ecm_rec_avg]
     
 if __name__=="__main__":
-    masking = False
+    masking = True
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
