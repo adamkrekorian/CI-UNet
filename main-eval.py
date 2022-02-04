@@ -73,9 +73,9 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
     pesq_rev_sum = 0
 
     for i in range(len(reconstructed_signals)):
-        dir_path = direct_path_signals[i]
+        dir_path = np.real(direct_path_signals[i])
         rec = np.real(reconstructed_signals[i])
-        full_rev = full_rev_signals[i]
+        full_rev = np.real(full_rev_signals[i])
     
         dir_path = dir_path/np.max(dir_path)
         rec = rec/np.max(rec)

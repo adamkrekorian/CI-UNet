@@ -34,9 +34,16 @@ def get_direct_rir(rir, fs, delay_time=0.002):
     dir_len = int(peaks[0][0] + delay)
     return rir[:dir_len]
 
-def apply_reverberation(x, rir):
-    rev_signal = signal.convolve(x, rir)
-    return rev_signal[:len(x)]
+def normalize_amp(x):
+    norm_factor = np.max(np.abs(x))
+    return (x * 0.99) / norm_factor;
+
+
+def apply_reverberation(x, rir, normalize=True):
+    x_rev = signal.convolve(x, rir)
+    if normalize:
+        x_rev = normalize_amp(x_rev)
+    return x_rev[:len(x)]
 
 def normalize(spect):
     #if np.min(np.ravel(spect)) <= 0:

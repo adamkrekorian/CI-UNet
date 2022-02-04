@@ -7,7 +7,7 @@ N_BINS = 64
 fs = 16000
 
 if __name__=="__main__":
-    masking = True
+    masking = False
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

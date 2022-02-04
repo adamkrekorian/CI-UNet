@@ -14,9 +14,6 @@ import matplotlib.pyplot as plt
 
 import Data.dataset as ds
 
-import warnings
-warnings.filterwarnings("error")
-
 N_BINS = 64
 fs = 16000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -111,8 +108,11 @@ def recreate_signal(file, rir, net, sig_len, mask=False):
     phase_list = np.split(phase, N, axis=1)
     rec_signal = []
     for sp, ph in zip(spect_list, phase_list):
-        net_spect = apply_net_to_spect(net, sp, scl_vals, mask=mask, rescale=True)
-        rec_signal.extend(recreate_from_spect(net_spect, ph))
+        if net is not None:
+            sp = apply_net_to_spect(net, sp, scl_vals, mask=mask, rescale=True)
+        else:
+            sp = rescale_spect(sp, scl_vals)
+        rec_signal.extend(recreate_from_spect(sp, ph))
     if (len(rec_signal) < sig_len):
         rec_signal = np.pad(rec_signal, (0, sig_len - len(rec_signal)), 'constant')
     return rec_signal[:sig_len]
@@ -134,9 +134,9 @@ def recreate_from_spect_set(directory, rir_directory, net, num_files=140, num_ri
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
                     fs, x = wavfile.read(f)
-                    dir_path_signal = ds.apply_reverberation(x, dir_rir)
-                    sig_len = len(dir_path_signal)
-                    full_rev_signal = ds.apply_reverberation(x, rir)
+                    sig_len = len(ds.apply_reverberation(x, dir_rir))
+                    dir_path_signal = recreate_signal(f, dir_rir, None, sig_len, mask=mask)
+                    full_rev_signal = recreate_signal(f, rir, None, sig_len, mask=mask)
                     rec_signal = recreate_signal(f, rir, net, sig_len, mask=mask)
                     direct_path_signals.append(dir_path_signal)
                     full_rev_signals.append(full_rev_signal[:sig_len])
