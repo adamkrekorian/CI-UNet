@@ -26,9 +26,9 @@ def rescale_spect(spect, scl_vals):
     return spect
 
 def apply_net(net, spect):
-    spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect), 0), 0)
+    spect_norm_tensor = torch.unsqueeze(torch.unsqueeze(torch.Tensor(spect), 0), 0).to(device)
     with torch.no_grad():
-        net_output = net(spect_norm_tensor.to(device))
+        net_output = net(spect_norm_tensor)
     net_output = np.squeeze(net_output).cpu().numpy()
     net_output = np.nan_to_num(net_output)
     return net_output
@@ -37,8 +37,6 @@ def apply_net(net, spect):
 def apply_net_to_spect(net, spect, scl_vals, mask=False, rescale=False):
     net_output = apply_net(net, spect)
     if mask:
-        net_output[net_output < 0.5] = 0
-        net_output[net_output >= 0.5] = 1
         spect = rescale_spect(spect, scl_vals) if rescale else spect
         net_output = spect * net_output
     else:
@@ -171,8 +169,8 @@ def create_22_channel_spect_set(directory, rir_directory, net, num_files=140, nu
                     dir_path_spect_w = apply_bin_weights(dir_path_spect, bin_weights)
                     
                     input_spect, _, scl_vals = ds.create_spectrogram(f, rir, norm=True)
+                    input_spect = input_spect[:, :sig_len]
                     full_rev_spect = rescale_spect(input_spect, scl_vals)
-                    full_rev_spect = full_rev_spect[:, :sig_len]
                     full_rev_spect = pad_spect(full_rev_spect)
                     full_rev_spect_w = apply_bin_weights(full_rev_spect, bin_weights)
 

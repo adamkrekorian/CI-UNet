@@ -16,7 +16,7 @@ import Data.dataset as ds
 import Eval.reconstruct as rc
 
 N_BINS = 64
-fs = 16000
+FS = 16000
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 def plot_norm_comp(fig, ax, spect, title):
@@ -29,27 +29,21 @@ def plot_norm_comp(fig, ax, spect, title):
 
 
 def test_norm(file, rir, net, ind):
-    fs, x = wavfile.read(file)
-    x_rev = ds.apply_reverberation(x, rir)
-    stft_out = ds.ci_stft(x_rev)
-    num_extra_bands = stft_out.shape[0] - N_BINS
-    stft_out = stft_out[:-num_extra_bands, :] if num_extra_bands > 0 else stft_out
-    spect = np.abs(stft_out)
-    spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
-    norm_spect, min_, max_ = ds.normalize(spect)
-    net_spect = rc.apply_net_to_full_spect(net, norm_spect, None)
-    unnorm_spect = rc.rescale_spect(norm_spect, (max_, min_))
-    unnorm_net_spect = rc.rescale_spect(net_spect, (max_, min_))
+    dir_rir = ds.get_direct_rir(rir)
+    spect, _, _ = ds.create_spectrogram(file, rir, norm=False)
+    norm_spect, min_, max_ = ds.normalize(spect) 
+    dir_spect, _, _ = ds.create_spectrogram(file, dir_rir, norm=False)
+    net_spect = rc.apply_net_to_full_spect(net, norm_spect, [min_, max_], rescale=True)
 
-    spects = [spect, net_spect, unnorm_spect, unnorm_net_spect]
-    titles = ["Original Spectrogram", "Net Spectrogram", "Unnormalized Spectrogram", "Unnormalized Net Spectrogram"]
+    spects = [np.log10(spect), np.log10(net_spect), np.log10(dir_spect)]
+    titles = ["Original Spectrogram", "Net Spectrogram", "Target Spectrogram"]
 
-    fig, axs = plt.subplots(len(spects), 1, figsize=(10, 10), dpi=200)    
+    fig, axs = plt.subplots(len(spects), 1, figsize=(10, 12), dpi=200)    
     
     for i, ax in enumerate(axs):
         plot_norm_comp(fig, ax, spects[i], titles[i]) 
 
-    plt.savefig(f"./Eval/Results/Norm_Comp/comp_{ind}", dpi=200, bbox_inches="tight")
+    plt.savefig(f"./Eval/Results/Comp/comp_{ind}", dpi=200, bbox_inches="tight")
     
 def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
     for i, rir_filename in enumerate(os.listdir(rir_directory)):
@@ -57,13 +51,12 @@ def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
             break
         r = os.path.join(rir_directory, rir_filename)
         if os.path.isfile(r):
-            rir = ds.load_rir(r, fs)
-            dir_rir = ds.get_direct_rir(rir, 16000)
-    for i, filename in enumerate(os.listdir(directory)):
-        if i == num_files:
-            break
-        f = os.path.join(directory, filename)
-        if os.path.isfile(f):
-            test_norm(f, dir_rir, net, i)
-        else:
-            num_files += 1
+            rir = ds.load_rir(r, FS)
+            for i, filename in enumerate(os.listdir(directory)):
+                if i == num_files:
+                    break
+                f = os.path.join(directory, filename)
+                if os.path.isfile(f):
+                    test_norm(f, rir, net, i)
+                else:
+                    num_files += 1
