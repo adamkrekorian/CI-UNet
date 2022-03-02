@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -80,7 +82,10 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
         dir_path = dir_path/np.max(dir_path)
         rec = rec/np.max(rec)
         full_rev = full_rev/np.max(full_rev)
-        if i == 0:
+        if i in range(10):
+            if not os.path.exists(f"./Eval/Results/Speech/sentence_{i}"):
+                os.makedirs(f"./Eval/Results/Speech/sentence_{i}")
+            
             plt.figure(figsize=(20,20))
         
             plt.subplot(3, 1, 1)
@@ -90,23 +95,24 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Reverberant Signal")
 
             # Save .wav file of speech
-            wavfile.write("./Eval/Results/full_reverb_speech.wav", fs, full_rev)
+            wavfile.write(f"./Eval/Results/Speech/sentence_{i}/full_reverb_speech.wav", fs, full_rev)
 
             plt.subplot(3, 1, 2)
             plt.plot(rec)
             plt.xlabel("Samples")
             plt.ylabel("Normalized Amplitude")
+
             if mask:
                 plt.title("Recreated Signal (IBM)")
                 
                 # Save .wav file of speech
-                wavfile.write("./Eval/Results/rec_mask_speech.wav", fs, rec)
+                wavfile.write(f"./Eval/Results/Speech/sentence_{i}/rec_mask_speech.wav", fs, rec)
                 
             else:
                 plt.title("Recreated Signal")
                 
                 # Save .wav file of speech
-                wavfile.write("./Eval/Results/rec_speech.wav", fs, rec)
+                wavfile.write(f"./Eval/Results/Speech/sentence_{i}/rec_speech.wav", fs, rec)
                 
             plt.subplot(3, 1, 3)
             plt.plot(dir_path)
@@ -115,12 +121,12 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Direct Path Signal")
 
             # Save .wav file of speech
-            wavfile.write("./Eval/Results/dir_path_speech.wav", fs, dir_path)
+            wavfile.write(f"./Eval/Results/Speech/sentence_{i}/dir_path_speech.wav", fs, dir_path)
 
             if mask:
-                plt.savefig("./Eval/Results/res-eval-64-rec-comp-bm-%d.png" % i)
+                plt.savefig(f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-bm-%d.png" % i)
             else:
-                plt.savefig("./Eval/Results/res-eval-64-rec-comp-%d.png" % i)
+                plt.savefig(f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-%d.png" % i)
 
                 
         stoi_rec_sum += stoi(dir_path, rec, fs)
@@ -200,7 +206,7 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
         
             for ax, temp_sp in zip(axs, temp_spects):
                 #temp_im = ax.imshow(temp_sp, vmin=0, vmax=np.max(temp_sp), cmap=plt.get_cmap("jet"))
-                temp_im = ax.imshow(temp_sp, cmap=plt.get_cmap("jet"))
+                temp_im = ax.imshow(np.log10(temp_sp), cmap=plt.get_cmap("jet"))
                 ax.set_xlabel("Frames")
                 ax.set_ylabel("Channels")
                 ax.set_aspect('auto')
@@ -249,7 +255,7 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
     return [ecm_rev_avg, ecm_rec_avg]
     
 if __name__=="__main__":
-    masking = True
+    masking = False
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'

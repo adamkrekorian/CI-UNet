@@ -16,7 +16,7 @@ from Eval.reconstruct import recreate_from_spect_set, create_22_channel_spect_se
 from Eval.testing import norm_comp_set
 
 N_BINS = 64
-fs = 16000
+FS = 16000
 
 def plot_example_spects(testing_data, mask=False):
     i = 1
@@ -91,7 +91,7 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Reverberant Signal")
 
             # Save .wav file of speech
-            wavfile.write("./Eval/Results/full_reverb_speech.wav", fs, full_rev)
+            wavfile.write("./Eval/Results/full_reverb_speech.wav", FS, full_rev)
 
             plt.subplot(3, 1, 2)
             plt.plot(rec)
@@ -101,13 +101,13 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
                 plt.title("Recreated Signal (IBM)")
                 
                 # Save .wav file of speech
-                wavfile.write("./Eval/Results/rec_mask_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_mask_speech.wav", FS, rec)
                 
             else:
                 plt.title("Recreated Signal")
                 
                 # Save .wav file of speech
-                wavfile.write("./Eval/Results/rec_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_speech.wav", FS, rec)
                 
             plt.subplot(3, 1, 3)
             plt.plot(dir_path)
@@ -116,7 +116,7 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Direct Path Signal")
 
             # Save .wav file of speech
-            wavfile.write("./Eval/Results/dir_path_speech.wav", fs, dir_path)
+            wavfile.write("./Eval/Results/dir_path_speech.wav", FS, dir_path)
 
             if mask:
                 plt.savefig("./Eval/Results/res-eval-64-rec-comp-bm-%d.png" % i)
@@ -124,11 +124,11 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
                 plt.savefig("./Eval/Results/res-eval-64-rec-comp-%d.png" % i)
 
                 
-        stoi_rec_sum += stoi(dir_path, rec, fs)
-        stoi_rev_sum += stoi(dir_path, full_rev, fs)
+        stoi_rec_sum += stoi(dir_path, rec, FS)
+        stoi_rev_sum += stoi(dir_path, full_rev, FS)
             
-        pesq_rec_sum += pesq(fs, dir_path, rec, 'wb')
-        pesq_rev_sum += pesq(fs, dir_path, full_rev, 'wb')
+        pesq_rec_sum += pesq(FS, dir_path, rec, 'wb')
+        pesq_rev_sum += pesq(FS, dir_path, full_rev, 'wb')
     
     stoi_rec_avg = stoi_rec_sum / len(reconstructed_signals)
     stoi_rev_avg = stoi_rev_sum / len(reconstructed_signals)
@@ -267,4 +267,4 @@ if __name__=="__main__":
     directory_test = "./Data/Speech_Files/Testing/"
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
-    norm_comp_set(directory_test, rir_directory_test, net, num_files=20)
+    norm_comp_set(directory_test, rir_directory_test, net, num_files=10)

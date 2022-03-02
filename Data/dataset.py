@@ -13,7 +13,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 N_BINS = 64
-fs = 16000
+FS = 16000
 EPS = np.nextafter(0, 1)
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -27,7 +27,7 @@ def load_rir(filepath, target_fs):
         rir = rir[0::fsx]
     return rir
 
-def get_direct_rir(rir, fs, delay_time=0.002):
+def get_direct_rir(rir, fs=FS, delay_time=0.002):
     max_val = np.max(rir)
     peaks = signal.find_peaks(rir, prominence=max_val/4) 
     delay = int((delay_time * fs) - 1)
@@ -38,19 +38,14 @@ def normalize_amp(x):
     norm_factor = np.max(np.abs(x))
     return (x * 0.99) / norm_factor;
 
-
 def apply_reverberation(x, rir, normalize=True):
     x_rev = signal.convolve(x, rir)
-    if normalize:
-        x_rev = normalize_amp(x_rev)
+    x_rev = normalize_amp(x_rev) if normalize else x_rev
     return x_rev[:len(x)]
 
-def normalize(spect):
-    #if np.min(np.ravel(spect)) <= 0:
-    #    print(np.min(np.ravel(spect))) 
+def normalize(spect): 
     spect[spect == 0.] = EPS
     spect = np.log10(spect)
-    # spect = np.ma.log(spect).filled(np.min(np.ma.log(spect).flatten()))
     feature_vector = spect.ravel()
     min_ = np.min(feature_vector)
     max_ = np.max(feature_vector)
@@ -66,7 +61,7 @@ def add_noise_at_20db(spect):
     spect[spect == 0] = 1e-40
     return spect
 
-def ci_stft(x, fs=fs, N_BINS=N_BINS):
+def ci_stft(x, fs=FS, N_BINS=N_BINS):
     window_len = N_BINS*2
     hamming_window = signal.windows.hamming(window_len)
     f, t, stft_out = signal.stft(x, fs, window=hamming_window,
@@ -88,7 +83,7 @@ def create_spectrogram(file, rir, norm=True):
         return spect_norm, phase, [min_, max_]
     return spect, phase, None
     
-def spect_train_set_for_rir(directory, rir, num_files=5):
+def spect_train_set_for_rir(directory, rir, num_files=1):
     data = np.zeros((N_BINS,1))
     for i, filename in enumerate(os.listdir(directory)):
         if i == num_files:
@@ -142,7 +137,7 @@ def calculate_esnr(f, rir, dir_rir):
     rev_sig = apply_reverberation(sig, rir)
     dir_sig = apply_reverberation(sig, dir_rir)
     resid_sig = rev_sig - dir_sig
-    esnr = 10 * np.log(np.sum(np.square(dir_sig)) / np.sum(np.square(resid_sig)))
+    esnr = 10 * np.log10(np.sum(np.square(dir_sig)) / np.sum(np.square(resid_sig)))
     return esnr
 
 def ibm_from_srr(srr_dB, t):
@@ -161,7 +156,7 @@ def ibm_train_set_for_rir(directory, rir, dir_rir, num_files=5):
             dir_spect, _, _ = create_spectrogram(f, dir_rir, norm=False)
             srr = calculate_srr(rev_spect, dir_spect)
             esnr = calculate_esnr(f, rir, dir_rir)
-            srr_dB = 10 * np.log(srr);
+            srr_dB = 10 * np.log10(srr);
             T = -6
             ideal_binary_mask = ibm_from_srr(srr_dB, T + esnr)
             data = np.concatenate((data, ideal_binary_mask), axis=1)
@@ -177,7 +172,7 @@ def ibm_test_datapoint(file, rir, dir_rir):
     dir_spect, _, _ = create_spectrogram(file, dir_rir, norm=False)
     srr = calculate_srr(rev_spect, dir_spect)
     esnr = calculate_esnr(file, rir, dir_rir)
-    srr_dB = 10 * np.log(srr);
+    srr_dB = 10 * np.log10(srr);
     T = -6
     ideal_binary_mask = ibm_from_srr(srr_dB, T + esnr)
     pad_amount = N_BINS - (ideal_binary_mask.shape[1] % N_BINS)
@@ -201,7 +196,7 @@ def ibm_test_set_for_rir(directory, rir, dir_rir, num_files=5):
             num_files += 1
     return ibm_arr
 
-def create_spect_set(directory, rir_directory, spect_function, num_files=5, num_rirs=3, fs=16000, mask=False, mask_function=None):
+def create_spect_set(directory, rir_directory, spect_function, num_files=1, num_rirs=1, fs=FS, mask=False, mask_function=None):
     X_arr = []
     y_arr = []
     for i, rir_filename in enumerate(os.listdir(rir_directory)):
