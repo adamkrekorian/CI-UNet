@@ -250,7 +250,7 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
     return [ecm_rec_avg, ecm_rev_avg]
     
 if __name__=="__main__":
-    masking = False
+    masking = True
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -267,4 +267,4 @@ if __name__=="__main__":
     directory_test = "./Data/Speech_Files/Testing/"
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
-    norm_comp_set(directory_test, rir_directory_test, net, num_files=10)
+    norm_comp_set(directory_test, rir_directory_test, net, num_files=10, mask=masking)

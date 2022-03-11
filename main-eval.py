@@ -59,10 +59,11 @@ def plot_example_spects(testing_data, mask=False):
     plt.xlabel("Time Domain")
     plt.ylabel("Frequency Domain")
     if mask:
-        plt.savefig("./Eval/Results/res-eval-64-bm-%d.png" % i)
+        fig_filename = f"./Eval/Results/res-eval-64-bm-{i}.png"
     else:
-        plt.savefig("./Eval/Results/res-eval-64-%d.png" % i)
-    
+        fig_filename = f"./Eval/Results/res-eval-64-{i}.png"
+
+    plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
 
 
 def compute_intel_metrics(directory, rir_directory, net, mask=False):
@@ -86,7 +87,7 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             if not os.path.exists(f"./Eval/Results/Speech/sentence_{i}"):
                 os.makedirs(f"./Eval/Results/Speech/sentence_{i}")
             
-            plt.figure(figsize=(20,20))
+            plt.figure(figsize=(15, 15))
         
             plt.subplot(3, 1, 1)
             plt.plot(full_rev)
@@ -124,10 +125,11 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             wavfile.write(f"./Eval/Results/Speech/sentence_{i}/dir_path_speech.wav", fs, dir_path)
 
             if mask:
-                plt.savefig(f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-bm-%d.png" % i)
+                fig_filename = f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-bm-{i}.png"
             else:
-                plt.savefig(f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-%d.png" % i)
+                fig_filename = f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-{i}.png"
 
+            plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
                 
         stoi_rec_sum += stoi(dir_path, rec, fs)
         stoi_rev_sum += stoi(dir_path, full_rev, fs)
@@ -140,47 +142,43 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
 
     pesq_rec_avg = pesq_rec_sum / len(reconstructed_signals)
     pesq_rev_avg = pesq_rev_sum / len(reconstructed_signals)
-    return [stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg]
+    return [stoi_rev_avg, stoi_rec_avg, pesq_rev_avg, pesq_rec_avg]
 
-def plot_intel_res(stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg, mask=False):
+def plot_intel_res(avgs, mask=False):
     if mask:
         labels = ["Reverberant Signal", "Recreated Signal (IBM)"]
     else:
         labels = ["Reverberant Signal", "Recreated Signal"]
     colors = ["red", "blue"]
-    stoi_values = [stoi_rev_avg, stoi_rec_avg]
-    pesq_values = [pesq_rev_avg, pesq_rec_avg]
-    print(stoi_values)
-    print(pesq_values)
-    
-    fig, axs = plt.subplots(1, 2, figsize=(10,5))
-    
-    rect0 = axs[0].bar(labels, stoi_values, color=colors)
-    axs[0].set_xlabel("Signal")
-    axs[0].set_ylabel("STOI Value")
-    axs[0].set_title("Mean STOI results (N = 140)")
-    axs[0].set_ylim((0, 1))
-    for i, v in enumerate(stoi_values):
-        xloc = rect0[i].get_x() + rect0[i].get_width() / 2
-        yloc = 1.05 * rect0[i].get_height()
-        axs[0].text(xloc, yloc, f"{v:.3f}")
-    
-    rect1 = axs[1].bar(labels, pesq_values, color=colors)
-    axs[1].set_xlabel("Signal")
-    axs[1].set_ylabel("PESQ Value")
-    axs[1].set_title("Mean PESQ results (N = 140)")
-    axs[1].set_ylim((0.5, 1.5))
-    for i, v in enumerate(pesq_values):
-        xloc = rect1[i].get_x() + rect1[i].get_width() / 2
-        yloc = 1.05 * rect1[i].get_height()
-        axs[1].text(xloc, yloc, f"{v:.3f}")
-    
-    
-    if mask:
-        plt.savefig("./Eval/Results/intel-eval-bm-64.png")
-    else:
-        plt.savefig("./Eval/Results/intel-eval-64.png")
+    stoi_values = avgs[:2]#[stoi_rev_avg, stoi_rec_avg]
+    pesq_values = avgs[2:4] #[pesq_rev_avg, pesq_rec_avg]
+    ecm_values = avgs[4:]
 
+    names = ["STOI", "PESQ", "ECM"]
+    print(pesq_values)
+
+    def plot_metric(ax, name, vals):
+        rect = ax.bar(labels, vals, color=colors)
+        ax.set_xlabel("Signal")
+        ax.set_ylabel(f"{name} Value")
+        ax.set_title(f"Mean {name} results (N = 140)")
+        ax.set_ylim((0.5, 1.6))
+        for i, v in enumerate(vals):
+            xloc = rect[i].get_x() + rect[i].get_width() / 2
+            yloc = 1.05 * rect[i].get_height()
+            ax.text(xloc, yloc, f"{v:.3f}")
+    
+    fig, axs = plt.subplots(1, 3, figsize=(15,5))
+
+    for i, ax in enumerate(axs):
+        plot_metric(ax, names[i], avgs[2*i:2*(i+1)]) 
+        
+    if mask:
+        fig_filename = "./Eval/Results/intel-eval-bm-64.png"
+    else:
+        fig_filename = "./Eval/Results/intel-eval-64.png"
+
+    plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
 
 def compute_ecm_metrics(directory, rir_directory, net, mask=False):
     rec_spects, dir_spects, full_spects = create_22_channel_spect_set(directory, rir_directory, net, mask=mask)
@@ -205,7 +203,6 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
             fig, axs = plt.subplots(3, 1, figsize=(20,20))
         
             for ax, temp_sp in zip(axs, temp_spects):
-                #temp_im = ax.imshow(temp_sp, vmin=0, vmax=np.max(temp_sp), cmap=plt.get_cmap("jet"))
                 temp_im = ax.imshow(np.log10(temp_sp), cmap=plt.get_cmap("jet"))
                 ax.set_xlabel("Frames")
                 ax.set_ylabel("Channels")
@@ -241,8 +238,6 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
         if i == 0:
             np.savetxt('rec_spect.csv', rec_spect, delimiter=',')
             np.savetxt('full_spect.csv', full_spect, delimiter=',')
-            #vocode_rec = eng.vocodeCIStimulus(rec_spect_ml)
-            #vocode_rev = eng.vocodeCIStimulus(full_spect_ml)
 
         if np.isnan(ecm_rec_val):
             num_nan += 1
@@ -282,7 +277,8 @@ if __name__=="__main__":
     plot_example_spects(test_dataset, mask=masking)
 
     intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
-    plot_intel_res(intel_res[0], intel_res[1], intel_res[2], intel_res[3], mask=masking)
+    
     print("Computing ECM Metrics...")
     ecm_res = compute_ecm_metrics(directory_test, rir_directory_test, net, mask=masking)
+    plot_intel_res(intel_res + ecm_res,  mask=masking)
     print(ecm_res)

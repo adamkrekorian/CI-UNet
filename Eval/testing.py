@@ -28,12 +28,12 @@ def plot_norm_comp(fig, ax, spect, title):
     ax.set_title(title)
 
 
-def test_norm(file, rir, net, ind):
+def test_norm(file, rir, net, ind, mask=False):
     dir_rir = ds.get_direct_rir(rir)
     spect, _, _ = ds.create_spectrogram(file, rir, norm=False)
     norm_spect, min_, max_ = ds.normalize(spect) 
     dir_spect, _, _ = ds.create_spectrogram(file, dir_rir, norm=False)
-    net_spect = rc.apply_net_to_full_spect(net, norm_spect, [min_, max_], rescale=True)
+    net_spect = rc.apply_net_to_full_spect(net, norm_spect, [min_, max_], mask=mask, rescale=True)
 
     spects = [np.log10(spect), np.log10(net_spect), np.log10(dir_spect)]
     titles = ["Original Spectrogram", "Net Spectrogram", "Target Spectrogram"]
@@ -43,9 +43,13 @@ def test_norm(file, rir, net, ind):
     for i, ax in enumerate(axs):
         plot_norm_comp(fig, ax, spects[i], titles[i]) 
 
-    plt.savefig(f"./Eval/Results/Comp/comp_{ind}", dpi=200, bbox_inches="tight")
+    if mask:
+        plt.savefig(f"./Eval/Results/Comp/comp_{ind}_bm", dpi=200, bbox_inches="tight")
+    else:
+        plt.savefig(f"./Eval/Results/Comp/comp_{ind}", dpi=200, bbox_inches="tight")
+
     
-def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
+def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1, mask=False):
     for i, rir_filename in enumerate(os.listdir(rir_directory)):
         if i == num_rirs:
             break
@@ -57,6 +61,6 @@ def norm_comp_set(directory, rir_directory, net, num_files=140, num_rirs=1):
                     break
                 f = os.path.join(directory, filename)
                 if os.path.isfile(f):
-                    test_norm(f, rir, net, i)
+                    test_norm(f, rir, net, i, mask)
                 else:
                     num_files += 1
