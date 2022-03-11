@@ -202,17 +202,18 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
     INITIAL_LR = lr
     # Regularization
     REG = reg
+    # Momentum
+    MOMENTUM = 0.2
     # Total number of training epochs
     EPOCHS = epochs
     # Learning rate decay policy.
-    DECAY_EPOCHS = 2
-    DECAY = 0.8
+    DECAY_EPOCHS = 3
+    DECAY = 0.7
     # Loss function
     criterion = loss_f
     # Optimizer
     optimizer = torch.optim.Adam(net.parameters(),
-                             lr=INITIAL_LR,
-                             weight_decay=REG)
+                             lr=INITIAL_LR, weight_decay=REG)
     # Initialize dataloaders
     train_dataloader = DataLoader(train_data, batch_size=1, shuffle=True)
     test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True)
@@ -224,7 +225,9 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
         
     for i in range(0, EPOCHS):
         print(datetime.datetime.now())
+
         net.train()
+
         print("Epoch %d:" % i)
         
         total_examples = 0
@@ -239,7 +242,7 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
                 
             optimizer.zero_grad()  # Zero the gradient of the optimizer
                 
-            outputs = net.forward(inputs)  # Forward pass to generate outputs
+            outputs = net(inputs)  # Forward pass to generate outputs
            
             loss = criterion(outputs, targets)  # Compute loss
             loss.backward()  # Backward loss and compute gradient
@@ -263,11 +266,10 @@ def train(n_bins, net, train_data, test_data, mask=False, lr=0.01, reg=1e-3, epo
             for batch_idx, (inputs, targets) in enumerate(test_dataloader):
                 inputs = inputs.to(device)
                 targets = targets.to(device)
-                optimizer.zero_grad()
+                #optimizer.zero_grad()
                 outputs = net(inputs)
                 if mask:
-                    outputs[outputs < 0.5] = 0
-                    outputs[outputs >= 0.5] = 1
+                    outputs = torch.where(outputs >= 0.5, 1, 0)
                 loss = criterion(outputs, targets)
                 val_loss += loss
 

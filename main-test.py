@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -15,9 +13,10 @@ import matlab.engine
 from Model_Classes.ci_unet_class import CI_Unet_64
 from Data.dataset import extract_dataset
 from Eval.reconstruct import recreate_from_spect_set, create_22_channel_spect_set
+from Eval.testing import norm_comp_set
 
 N_BINS = 64
-fs = 16000
+FS = 16000
 
 def plot_example_spects(testing_data, mask=False):
     i = 1
@@ -59,11 +58,10 @@ def plot_example_spects(testing_data, mask=False):
     plt.xlabel("Time Domain")
     plt.ylabel("Frequency Domain")
     if mask:
-        fig_filename = f"./Eval/Results/res-eval-64-bm-{i}.png"
+        plt.savefig("./Eval/Results/res-eval-64-bm-%d.png" % i)
     else:
-        fig_filename = f"./Eval/Results/res-eval-64-{i}.png"
-
-    plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
+        plt.savefig("./Eval/Results/res-eval-64-%d.png" % i)
+    
 
 
 def compute_intel_metrics(directory, rir_directory, net, mask=False):
@@ -76,18 +74,15 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
     pesq_rev_sum = 0
 
     for i in range(len(reconstructed_signals)):
-        dir_path = np.real(direct_path_signals[i])
+        dir_path = direct_path_signals[i]
         rec = np.real(reconstructed_signals[i])
-        full_rev = np.real(full_rev_signals[i])
+        full_rev = full_rev_signals[i]
     
         dir_path = dir_path/np.max(dir_path)
         rec = rec/np.max(rec)
         full_rev = full_rev/np.max(full_rev)
-        if i in range(10):
-            if not os.path.exists(f"./Eval/Results/Speech/sentence_{i}"):
-                os.makedirs(f"./Eval/Results/Speech/sentence_{i}")
-            
-            plt.figure(figsize=(15, 15))
+        if i == 0:
+            plt.figure(figsize=(20,20))
         
             plt.subplot(3, 1, 1)
             plt.plot(full_rev)
@@ -96,24 +91,23 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Reverberant Signal")
 
             # Save .wav file of speech
-            wavfile.write(f"./Eval/Results/Speech/sentence_{i}/full_reverb_speech.wav", fs, full_rev)
+            wavfile.write("./Eval/Results/full_reverb_speech.wav", FS, full_rev)
 
             plt.subplot(3, 1, 2)
             plt.plot(rec)
             plt.xlabel("Samples")
             plt.ylabel("Normalized Amplitude")
-
             if mask:
                 plt.title("Recreated Signal (IBM)")
                 
                 # Save .wav file of speech
-                wavfile.write(f"./Eval/Results/Speech/sentence_{i}/rec_mask_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_mask_speech.wav", FS, rec)
                 
             else:
                 plt.title("Recreated Signal")
                 
                 # Save .wav file of speech
-                wavfile.write(f"./Eval/Results/Speech/sentence_{i}/rec_speech.wav", fs, rec)
+                wavfile.write("./Eval/Results/rec_speech.wav", FS, rec)
                 
             plt.subplot(3, 1, 3)
             plt.plot(dir_path)
@@ -122,63 +116,66 @@ def compute_intel_metrics(directory, rir_directory, net, mask=False):
             plt.title("Direct Path Signal")
 
             # Save .wav file of speech
-            wavfile.write(f"./Eval/Results/Speech/sentence_{i}/dir_path_speech.wav", fs, dir_path)
+            wavfile.write("./Eval/Results/dir_path_speech.wav", FS, dir_path)
 
             if mask:
-                fig_filename = f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-bm-{i}.png"
+                plt.savefig("./Eval/Results/res-eval-64-rec-comp-bm-%d.png" % i)
             else:
-                fig_filename = f"./Eval/Results/Speech/sentence_{i}/res-eval-64-rec-comp-{i}.png"
+                plt.savefig("./Eval/Results/res-eval-64-rec-comp-%d.png" % i)
 
-            plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
                 
-        stoi_rec_sum += stoi(dir_path, rec, fs)
-        stoi_rev_sum += stoi(dir_path, full_rev, fs)
+        stoi_rec_sum += stoi(dir_path, rec, FS)
+        stoi_rev_sum += stoi(dir_path, full_rev, FS)
             
-        pesq_rec_sum += pesq(fs, dir_path, rec, 'wb')
-        pesq_rev_sum += pesq(fs, dir_path, full_rev, 'wb')
+        pesq_rec_sum += pesq(FS, dir_path, rec, 'wb')
+        pesq_rev_sum += pesq(FS, dir_path, full_rev, 'wb')
     
     stoi_rec_avg = stoi_rec_sum / len(reconstructed_signals)
     stoi_rev_avg = stoi_rev_sum / len(reconstructed_signals)
 
     pesq_rec_avg = pesq_rec_sum / len(reconstructed_signals)
     pesq_rev_avg = pesq_rev_sum / len(reconstructed_signals)
-    return [stoi_rev_avg, stoi_rec_avg, pesq_rev_avg, pesq_rec_avg]
+    return [stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg]
 
-def plot_intel_res(avgs, mask=False):
+def plot_intel_res(stoi_rec_avg, stoi_rev_avg, pesq_rec_avg, pesq_rev_avg, mask=False):
     if mask:
         labels = ["Reverberant Signal", "Recreated Signal (IBM)"]
     else:
         labels = ["Reverberant Signal", "Recreated Signal"]
     colors = ["red", "blue"]
-    stoi_values = avgs[:2]#[stoi_rev_avg, stoi_rec_avg]
-    pesq_values = avgs[2:4] #[pesq_rev_avg, pesq_rec_avg]
-    ecm_values = avgs[4:]
-
-    names = ["STOI", "PESQ", "ECM"]
+    stoi_values = [stoi_rev_avg, stoi_rec_avg]
+    pesq_values = [pesq_rev_avg, pesq_rec_avg]
+    print(stoi_values)
     print(pesq_values)
-
-    def plot_metric(ax, name, vals):
-        rect = ax.bar(labels, vals, color=colors)
-        ax.set_xlabel("Signal")
-        ax.set_ylabel(f"{name} Value")
-        ax.set_title(f"Mean {name} results (N = 140)")
-        ax.set_ylim((0.5, 1.6))
-        for i, v in enumerate(vals):
-            xloc = rect[i].get_x() + rect[i].get_width() / 2
-            yloc = 1.05 * rect[i].get_height()
-            ax.text(xloc, yloc, f"{v:.3f}")
     
-    fig, axs = plt.subplots(1, 3, figsize=(15,5))
-
-    for i, ax in enumerate(axs):
-        plot_metric(ax, names[i], avgs[2*i:2*(i+1)]) 
-        
+    fig, axs = plt.subplots(1, 2, figsize=(10,5))
+    
+    rect0 = axs[0].bar(labels, stoi_values, color=colors)
+    axs[0].set_xlabel("Signal")
+    axs[0].set_ylabel("STOI Value")
+    axs[0].set_title("Mean STOI results (N = 140)")
+    axs[0].set_ylim((0, 1))
+    for i, v in enumerate(stoi_values):
+        xloc = rect0[i].get_x() + rect0[i].get_width() / 2
+        yloc = 1.05 * rect0[i].get_height()
+        axs[0].text(xloc, yloc, f"{v:.3f}")
+    
+    rect1 = axs[1].bar(labels, pesq_values, color=colors)
+    axs[1].set_xlabel("Signal")
+    axs[1].set_ylabel("PESQ Value")
+    axs[1].set_title("Mean PESQ results (N = 140)")
+    axs[1].set_ylim((0.5, 1.5))
+    for i, v in enumerate(pesq_values):
+        xloc = rect1[i].get_x() + rect1[i].get_width() / 2
+        yloc = 1.05 * rect1[i].get_height()
+        axs[1].text(xloc, yloc, f"{v:.3f}")
+    
+    
     if mask:
-        fig_filename = "./Eval/Results/intel-eval-bm-64.png"
+        plt.savefig("./Eval/Results/intel-eval-bm-64.png")
     else:
-        fig_filename = "./Eval/Results/intel-eval-64.png"
+        plt.savefig("./Eval/Results/intel-eval-64.png")
 
-    plt.savefig(fig_filename, dpi=200, bbox_inches="tight")
 
 def compute_ecm_metrics(directory, rir_directory, net, mask=False):
     rec_spects, dir_spects, full_spects = create_22_channel_spect_set(directory, rir_directory, net, mask=mask)
@@ -203,7 +200,8 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
             fig, axs = plt.subplots(3, 1, figsize=(20,20))
         
             for ax, temp_sp in zip(axs, temp_spects):
-                temp_im = ax.imshow(np.log10(temp_sp), cmap=plt.get_cmap("jet"))
+                #temp_im = ax.imshow(temp_sp, vmin=0, vmax=np.max(temp_sp), cmap=plt.get_cmap("jet"))
+                temp_im = ax.imshow(temp_sp, cmap=plt.get_cmap("jet"))
                 ax.set_xlabel("Frames")
                 ax.set_ylabel("Channels")
                 ax.set_aspect('auto')
@@ -238,6 +236,8 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
         if i == 0:
             np.savetxt('rec_spect.csv', rec_spect, delimiter=',')
             np.savetxt('full_spect.csv', full_spect, delimiter=',')
+            #vocode_rec = eng.vocodeCIStimulus(rec_spect_ml)
+            #vocode_rev = eng.vocodeCIStimulus(full_spect_ml)
 
         if np.isnan(ecm_rec_val):
             num_nan += 1
@@ -247,10 +247,10 @@ def compute_ecm_metrics(directory, rir_directory, net, mask=False):
 
     ecm_rec_avg = ecm_rec_sum / (len(rec_spects) - num_nan)
     ecm_rev_avg = ecm_rev_sum / (len(rec_spects) - num_nan)
-    return [ecm_rev_avg, ecm_rec_avg]
+    return [ecm_rec_avg, ecm_rev_avg]
     
 if __name__=="__main__":
-    masking = False
+    masking = True
     
     # Load Model
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -267,18 +267,4 @@ if __name__=="__main__":
     directory_test = "./Data/Speech_Files/Testing/"
     rir_directory_test = "./Data/RIR_Files/Testing/"
 
-    # Extract Dataset
-    print("Extracting testing set...")
-    test_dataset = extract_dataset(directory_test, rir_directory_test,
-                                   140, 1,
-                                   training_set=False, mask=masking)
-
-    # Plot Example Spect Comparison
-    plot_example_spects(test_dataset, mask=masking)
-
-    intel_res = compute_intel_metrics(directory_test, rir_directory_test, net, mask=masking)
-    
-    print("Computing ECM Metrics...")
-    ecm_res = compute_ecm_metrics(directory_test, rir_directory_test, net, mask=masking)
-    plot_intel_res(intel_res + ecm_res,  mask=masking)
-    print(ecm_res)
+    norm_comp_set(directory_test, rir_directory_test, net, num_files=10, mask=masking)
