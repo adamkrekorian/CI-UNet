@@ -31,7 +31,7 @@ if __name__=="__main__":
                                    training_set=False, mask=masking)
     print("Training")
     # Train
-    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=masking, epochs=20)
+    train(N_BINS, CI_Unet_64(), train_dataset, test_dataset, mask=masking, lr=0.05, epochs=50)
 
     
 
